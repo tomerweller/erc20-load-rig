@@ -1,0 +1,5 @@
+web3==4.0.0b11
+ethereum==2.3.0
+rlp==0.6.0
+requests==2.18.4
+numpy==1.14.2
