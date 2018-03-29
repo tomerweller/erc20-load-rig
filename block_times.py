@@ -1,22 +1,26 @@
 import time
 from common import w3
 
+INTERVAL = 0.1
 
 def get_block_timestamps(csv_out):
     blocks = {}
     while True:
         latest_block = w3.eth.getBlock("latest")
-        block_number = latest_block.number
-        b_timestamp = latest_block.timestamp
-        m_timestamp = int(time.time())
-        if block_number not in blocks:
-            blocks[block_number] = b_timestamp
-            line = ','.join([str(x) for x in [block_number, b_timestamp, m_timestamp, m_timestamp - b_timestamp]])
+        latest_block_number = latest_block.number
+        latest_block_timestamp = latest_block.timestamp
+        my_timestamp = int(time.time())
+        if latest_block_number not in blocks:
+            blocks[latest_block_number] = latest_block_timestamp
+            line = ','.join([str(x) for x in [latest_block_number,
+                                              latest_block_timestamp,
+                                              my_timestamp,
+                                              my_timestamp - latest_block_timestamp]])
             print(line)
             with open(csv_out, "a+") as csv_file:
                 csv_file.write(line + "\n")
-        time.sleep(0.5)
+        time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":
-    get_block_timestamps("blocks.csv")
+    get_block_timestamps("results/blocks.csv")

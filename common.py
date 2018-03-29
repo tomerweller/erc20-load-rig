@@ -1,5 +1,5 @@
 import os
-from web3 import Web3, Account, HTTPProvider
+from web3 import Web3, Account, HTTPProvider, IPCProvider
 
 
 def env(k):

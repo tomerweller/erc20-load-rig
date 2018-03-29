@@ -6,16 +6,15 @@ def test_timing():
     account = Account.create()
     tx_time = time.time()
     tx_hash = send_ether(FUNDER_ACCOUNT, get_funder_nonce(), account.address, 1)
-    print(tx_hash)
+    print("tx_hash", tx_hash)
     tx_receipt = w3.eth.getTransactionReceipt(tx_hash)
     print("transacting", end="", flush=True)
-    while not tx_receipt:
+    while not tx_receipt or not tx_receipt.blockNumber:
         tx_receipt = w3.eth.getTransactionReceipt(tx_hash)
         time.sleep(0.1)
         print(".", end="", flush=True)
-    print()
-
     end_time = time.time()
+    print()
     print("tx_time", tx_time)
     print("end_time", end_time)
     print("actual_duration", end_time - tx_time)
