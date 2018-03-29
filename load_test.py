@@ -40,13 +40,13 @@ def load_test(csv_in, csv_out):
         frm = random.choice(test_entries)
         to = random.choice(test_entries)
 
-        # t = threading.Thread(target=test_single, args=(frm, frm.nonce, to, csv_out))
+        t = threading.Thread(target=test_single, args=(frm, frm.nonce, to, csv_out))
         # test_single(frm, frm.nonce, to, csv_out)
         frm.nonce += 1
-        # t.start()
+        t.start()
 
         time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":
-    load_test("accounts.csv", "tx.csv")
+    load_test("results/accounts.csv", "results/tx.csv")

@@ -1,3 +1,4 @@
+env.sh
 .env
 *.csv
 .idea/

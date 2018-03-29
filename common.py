@@ -12,7 +12,8 @@ def env_int(k):
     return int(env(k))
 
 
-w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
+#w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
+w3 = Web3(IPCProvider(env("IPC_PROVIDER")))
 CHAIN_ID = env('CHAIN_ID')
 GAS_PRICE = env_int('GAS_PRICE')
 GAS_LIMIT = env_int('GAS_LIMIT')
