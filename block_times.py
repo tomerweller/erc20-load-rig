@@ -3,7 +3,11 @@ from common import w3
 
 INTERVAL = 0.1
 
+
 def get_block_timestamps(csv_out):
+    """gather block information to csv.
+    per block: block_number, block_timestamp (by miner), block_timestamp (by me), delta of both
+    """
     blocks = {}
     while True:
         latest_block = w3.eth.getBlock("latest")

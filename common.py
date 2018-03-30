@@ -12,30 +12,24 @@ def env_int(k):
     return int(env(k))
 
 
-#w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
-w3 = Web3(IPCProvider(env("IPC_PROVIDER")))
-CHAIN_ID = env('CHAIN_ID')
-GAS_PRICE = env_int('GAS_PRICE')
-GAS_LIMIT = env_int('GAS_LIMIT')
+class AccountWrapper:
+    def __init__(self, private_key):
+        self.account = Account.privateKeyToAccount(private_key)
+        self.nonce = w3.eth.getTransactionCount(self.account.address)
 
-# funder
-FUNDER_ACCOUNT = Account.privateKeyToAccount(env('FUNDER_PK'))
-FUNDER_NONCE = w3.eth.getTransactionCount(FUNDER_ACCOUNT.address)
+    def get_use_nonce(self):
+        self.nonce += 1
+        return self.nonce - 1
 
-# contract
-with open(env('ERC20_ABI_PATH'), 'r') as myfile:
-    abi = myfile.read().replace('\n', '')
-ERC20_CONTRACT = w3.eth.contract(address=env('ERC20_ADDRESS'), abi=abi)
+    def balance(self):
+        return w3.eth.getBalance(self.account.address)
 
 
-def get_funder_nonce():
-    global FUNDER_NONCE
-    tmp = FUNDER_NONCE
-    FUNDER_NONCE += 1
-    return tmp
+def create_account():
+    return AccountWrapper(Account.create().privateKey)
 
 
-def send_ether(from_account: object, nonce: object, to_address: object, val: object) -> object:
+def send_ether(from_account, nonce, to_address, val):
     tx = {
         "from": from_account.address,
         "to": to_address,
@@ -62,3 +56,20 @@ def send_tokens(from_account, nonce, to_address, val):
     signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
     result = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
     return w3.toHex(result)
+
+
+try:
+    w3 = Web3(IPCProvider(env("IPC_PROVIDER")))
+except Exception:
+    w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
+
+to_hex = w3.toHex
+
+CHAIN_ID = env('CHAIN_ID')
+GAS_PRICE = env_int('GAS_PRICE')
+GAS_LIMIT = env_int('GAS_LIMIT')
+funder = AccountWrapper(env('FUNDER_PK'))
+
+# contract
+with open(env('ERC20_ABI_PATH'), 'r') as myfile:
+    ERC20_CONTRACT = w3.eth.contract(address=env('ERC20_ADDRESS'), abi=myfile.read().replace('\n', ''))
