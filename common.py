@@ -1,4 +1,5 @@
 import os
+import random
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 
 
@@ -12,7 +13,29 @@ def env_int(k):
     return int(env(k))
 
 
+def copy_shuffle(l):
+    new_l = l[:]
+    random.shuffle(new_l)
+    return new_l
+
+
+class CheapRandomIterator:
+    """An iterator that consumes elements in a random order. shuffle. repeat.
+    Ensures predictable $$$ consumption
+    """
+
+    def __init__(self, elements):
+        self.elements = elements
+        self.work_set = copy_shuffle(elements)
+
+    def next(self):
+        if not self.work_set:
+            self.work_set = copy_shuffle(self.elements[:])
+        return self.work_set.pop()
+
+
 class AccountWrapper:
+    """Wrap around account and nonce. nonce is tracked in memory after initialization."""
     def __init__(self, private_key):
         self.account = Account.privateKeyToAccount(private_key)
         self.nonce = w3.eth.getTransactionCount(self.account.address)
