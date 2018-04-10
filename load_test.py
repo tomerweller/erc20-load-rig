@@ -2,7 +2,7 @@ import numpy
 import random
 import threading
 import time
-from common import AccountWrapper, CheapRandomIterator, send_tokens
+from common import AccountWrapper, CheapRandomIterator, send_tokens, get_arg, now_str
 
 INTERVAL = 0.125
 TOTAL_DURATION = 60
@@ -17,8 +17,8 @@ def do(frm, nonce, to, csv_out):
         csv_file.write(line + "\n")
 
 
-def load_test(csv_in, csv_out):
-    with open(csv_in) as f:
+def load_test(accounts_csv, csv_out):
+    with open(accounts_csv) as f:
         lines = f.readlines()
 
     print("getting nonce for all accounts")
@@ -36,4 +36,6 @@ def load_test(csv_in, csv_out):
 
 
 if __name__ == "__main__":
-    load_test("results/accounts.csv", "results/tx.csv")
+    arg = get_arg()
+    print("arg is:", arg)
+    load_test(get_arg(), f"results/txs.{now_str()}.csv")

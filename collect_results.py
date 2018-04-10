@@ -1,5 +1,6 @@
-from common import w3
-import time
+from common import w3, get_arg, now_str
+
+NUM_OF_BLOCKS = 12
 
 
 def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
@@ -10,16 +11,21 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
     with open(tx_csv) as f:
         lines = f.read().splitlines()
 
+    header_row = ['tx_hash', 'submitted_at']
+    for i in range(1, 1 + NUM_OF_BLOCKS):
+        header_row.append(f'block{i}')
+        header_row.append(f'my_block{i}')
+    header_row.append('gas_used')
+
     with open(tx_plus_csv, "w") as f:
-        f.write("tx_hash,submitted_at,block1,my1,block2,my2,block3,my3,block4,my4,block5,my5,block6,my6,block7,my7,"
-                "block8,my8,block9,my9,block10,my10,block11,my11,block12,my12,gas_used\n")
+        f.write(','.join(header_row)+"\n")
 
     for line in lines:
         data = line.split(',')
         tx_hash = data[0]
         tx = w3.eth.getTransactionReceipt(tx_hash)
         if tx:
-            for block_number in range(tx.blockNumber, tx.blockNumber + 12):
+            for block_number in range(tx.blockNumber, tx.blockNumber + NUM_OF_BLOCKS):
                 data.append(block_mem[str(block_number)][0])
                 data.append(block_mem[str(block_number)][1])
             data.append(str(tx.gasUsed))
@@ -31,4 +37,4 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
 
 
 if __name__ == "__main__":
-    collect_stats("results/tx.csv", "results/blocks.csv", "results/tx_plus" + str(int(time.time())) + ".csv")
+    collect_stats(get_arg(0), get_arg(1), f"results/tx.plus.{now_str()}.csv")

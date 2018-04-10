@@ -1,11 +1,13 @@
+import sys
 import os
 import random
+from datetime import datetime
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 
 
 def env(k):
     if k not in os.environ:
-        raise EnvironmentError
+        raise Exception(f"environment missing key \"{k}\"")
     return os.environ[k]
 
 
@@ -17,6 +19,16 @@ def copy_shuffle(l):
     new_l = l[:]
     random.shuffle(new_l)
     return new_l
+
+
+def now_str():
+    return datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
+
+
+def get_arg(i=0):
+    if len(sys.argv) < (2+i):
+        raise Exception(f"expected at least {i+1} command line argument/s")
+    return sys.argv[1+i]
 
 
 class CheapRandomIterator:
@@ -36,6 +48,7 @@ class CheapRandomIterator:
 
 class AccountWrapper:
     """Wrap around account and nonce. nonce is tracked in memory after initialization."""
+
     def __init__(self, private_key):
         self.account = Account.privateKeyToAccount(private_key)
         self.nonce = w3.eth.getTransactionCount(self.account.address)
