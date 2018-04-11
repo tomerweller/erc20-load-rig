@@ -1,7 +1,8 @@
 import numpy
 import random
-import threading
 import time
+from concurrent.futures import ProcessPoolExecutor
+
 from common import AccountWrapper, CheapRandomIterator, send_tokens, get_arg, now_str
 
 INTERVAL = 0.125
@@ -24,14 +25,14 @@ def load_test(accounts_csv, csv_out):
     print("getting nonce for all accounts")
     accounts = [AccountWrapper(line.split(',')[0]) for line in lines]
     accounts_random_iter = CheapRandomIterator(accounts)
+    pool = ProcessPoolExecutor()
 
     print("starting tests")
     for i in numpy.arange(0, TOTAL_DURATION / INTERVAL):
         print(i)
         frm = accounts_random_iter.next()
         to = random.choice(accounts)
-        t = threading.Thread(target=do, args=(frm, frm.get_use_nonce(), to, csv_out))
-        t.start()
+        pool.submit(do, frm, frm.get_use_nonce(), to, csv_out)
         time.sleep(INTERVAL)
 
 
