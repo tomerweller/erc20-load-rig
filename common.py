@@ -1,18 +1,30 @@
 import sys
 import os
 import random
+import math
 from datetime import datetime
+
+import requests
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 
 
-def env(k):
-    if k not in os.environ:
-        raise Exception(f"environment missing key \"{k}\"")
-    return os.environ[k]
+def env(k, default=None):
+    try:
+        return os.environ[k]
+    except KeyError as e:
+        if default is not None:
+            return default
+        else:
+            raise e
 
 
-def env_int(k):
-    return int(env(k))
+def env_int(k, default=None):
+    return int(env(k, default))
+
+
+CHAIN_ID = env('CHAIN_ID')
+GAS_PRICE = env_int('GAS_PRICE')
+GAS_LIMIT = env_int('GAS_LIMIT')
 
 
 def copy_shuffle(l):
@@ -26,9 +38,9 @@ def now_str():
 
 
 def get_arg(i=0):
-    if len(sys.argv) < (2+i):
+    if len(sys.argv) < (2 + i):
         raise Exception(f"expected at least {i+1} command line argument/s")
-    return sys.argv[1+i]
+    return sys.argv[1 + i]
 
 
 class CheapRandomIterator:
@@ -80,11 +92,11 @@ def send_ether(from_account, nonce, to_address, val):
     return w3.toHex(result)
 
 
-def send_tokens(from_account, nonce, to_address, val):
+def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
     tx = {
         "from": from_account.address,
         "gas": GAS_LIMIT,
-        "gasPrice": GAS_PRICE,
+        "gasPrice": gas_price,
         "chainId": CHAIN_ID,
         "nonce": nonce
     }
@@ -94,16 +106,18 @@ def send_tokens(from_account, nonce, to_address, val):
     return w3.toHex(result)
 
 
+def get_gas_price(threshold):
+    r = requests.get('https://ethgasstation.info/json/ethgasAPI.json')
+    return int(r.json()[threshold] * math.pow(10, 8))
+
+
 try:
     w3 = Web3(IPCProvider(env("IPC_PROVIDER")))
-except Exception:
+except KeyError:
     w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
 
 to_hex = w3.toHex
 
-CHAIN_ID = env('CHAIN_ID')
-GAS_PRICE = env_int('GAS_PRICE')
-GAS_LIMIT = env_int('GAS_LIMIT')
 funder = AccountWrapper(env('FUNDER_PK'))
 
 # contract
