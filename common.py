@@ -1,7 +1,9 @@
+import logging
 import sys
 import os
 import random
 import math
+import time
 from datetime import datetime
 
 import requests
@@ -61,9 +63,17 @@ class CheapRandomIterator:
 class AccountWrapper:
     """Wrap around account and nonce. nonce is tracked in memory after initialization."""
 
-    def __init__(self, private_key):
+    def __init__(self, private_key, nonce=None):
         self.account = Account.privateKeyToAccount(private_key)
-        self.nonce = w3.eth.getTransactionCount(self.account.address)
+        self.nonce = w3.eth.getTransactionCount(self.account.address) if nonce is None else nonce
+
+    @property
+    def address(self):
+        return self.account.address
+
+    @property
+    def private_key(self):
+        return to_hex(self.account.privateKey)
 
     def get_use_nonce(self):
         self.nonce += 1
@@ -74,15 +84,15 @@ class AccountWrapper:
 
 
 def create_account():
-    return AccountWrapper(Account.create().privateKey)
+    return AccountWrapper(Account.create().privateKey, 0)
 
 
-def send_ether(from_account, nonce, to_address, val):
+def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
     tx = {
         "from": from_account.address,
         "to": to_address,
         "gas": GAS_LIMIT,
-        "gasPrice": GAS_PRICE,
+        "gasPrice": gas_price,
         "value": val,
         "chainId": CHAIN_ID,
         "nonce": nonce
@@ -93,6 +103,7 @@ def send_ether(from_account, nonce, to_address, val):
 
 
 def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
+    start = time.time()
     tx = {
         "from": from_account.address,
         "gas": GAS_LIMIT,
@@ -103,12 +114,54 @@ def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
     tx = ERC20_CONTRACT.functions.transfer(to_address, val).buildTransaction(tx)
     signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
     result = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
+    log(f"tx time: {time.time()-start}")
     return w3.toHex(result)
+
+
+def wait_for_tx(tx_hash):
+    while True:
+        tx = w3.eth.getTransactionReceipt(tx_hash)
+        if tx and tx.blockNumber:
+            return
+        time.sleep(1)
 
 
 def get_gas_price(threshold):
     r = requests.get('https://ethgasstation.info/json/ethgasAPI.json')
     return int(r.json()[threshold] * math.pow(10, 8))
+
+
+def stringify_list(l):
+    return [str(v) for v in l]
+
+
+class CSVWriter:
+    def __init__(self, path, cols):
+        self.path = path
+        self.cols = cols
+        with open(path, "w") as csv_file:
+            csv_file.write(",".join(cols) + "\n")
+
+    def append(self, row):
+        with open(self.path, "a+") as csv_file:
+            csv_file.write(",".join(stringify_list(row)) + "\n")
+
+    def append_all(self, rows):
+        with open(self.path, "a+") as csv_file:
+            csv_file.write('\n'.join([",".join(stringify_list(row)) for row in rows]) + "\n")
+
+
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+root.addHandler(ch)
+
+
+def log(m):
+    logging.info(m)
 
 
 try:
