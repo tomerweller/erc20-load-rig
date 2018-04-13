@@ -102,11 +102,11 @@ def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
     return w3.toHex(result)
 
 
-def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
+def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
     start = time.time()
     tx = {
         "from": from_account.address,
-        "gas": GAS_LIMIT,
+        "gas": gas_limit,
         "gasPrice": gas_price,
         "chainId": CHAIN_ID,
         "nonce": nonce
