@@ -27,6 +27,5 @@ def monitor_block_timestamps(csv_out, interval):
 
 if __name__ == "__main__":
     block_csv_writer = CSVWriter(f"results/blocks.{now_str()}.csv",
-                                 ["block_number", "block_timestamp", "my_timestamp", "timestamp_delta", "tx_count",
-                                  "avg_gas_price"])
+                                 ["block_number", "block_timestamp", "my_timestamp", "timestamp_delta", "tx_count"])
     monitor_block_timestamps(block_csv_writer, INTERVAL)

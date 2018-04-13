@@ -87,11 +87,10 @@ def create_account():
     return AccountWrapper(Account.create().privateKey, 0)
 
 
-def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
+def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
     tx = {
-        #"from": from_account.address,
         "to": to_address,
-        "gas": GAS_LIMIT,
+        "gas": gas_limit,
         "gasPrice": gas_price,
         "value": val,
         "chainId": CHAIN_ID,
@@ -105,9 +104,8 @@ def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
 def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
     start = time.time()
     tx = {
-        #"from": from_account.address,
         "gas": gas_limit,
-        #"gasPrice": gas_price,
+        "gasPrice": gas_price,
         "chainId": CHAIN_ID,
         "nonce": nonce
     }
@@ -136,7 +134,6 @@ def stringify_list(l):
 
 
 def get_latest_block():
-    # return get_w3().eth.getBlock("latest")
     return w3.eth.getBlock("latest")
 
 
@@ -173,10 +170,12 @@ def get_w3():
     try:
         return Web3(IPCProvider(env("IPC_PROVIDER")))
     except KeyError:
+        log("No IPC provider. using HTTP provider")
         return Web3(HTTPProvider(env("HTTP_PROVIDER")))
 
 
 w3 = get_w3()
+w3.eth.enable_unaudited_features()
 to_hex = w3.toHex
 
 funder = AccountWrapper(env('FUNDER_PK'))

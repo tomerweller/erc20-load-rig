@@ -1,4 +1,4 @@
-web3==4.0.0b11
+web3==4.1.0
 ethereum==2.3.0
 rlp==0.6.0
 requests==2.18.4

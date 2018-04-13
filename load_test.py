@@ -3,17 +3,17 @@ import time
 from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps
 
-from common import send_tokens, get_arg, now_str, get_gas_price, create_account, send_ether, funder, log, wait_for_tx, \
-    CSVWriter, get_latest_block
+from common import send_tokens, now_str, get_gas_price, create_account, send_ether, funder, log, wait_for_tx, CSVWriter,\
+    get_latest_block, env, env_int
 
-THRESHOLD = "fast"
-TOTAL_DURATION = 30
-TOTAL_ACCOUNTS = 5
-PREFUND_MULTIPLIER = 4
-TX_PER_SEC = 10
-GAS_UPDATE_INTERVAL = 10
-BLOCK_UPDATE_INTERVAL = 0.1
-TOKEN_TRANSFER_GAS_LIMIT = 36142
+THRESHOLD = env("THRESHOLD")
+TOTAL_TEST_DURATION_SEC = env_int("TOTAL_TEST_DURATION_SEC")
+TOTAL_TEST_ACCOUNTS = env_int("TOTAL_TEST_ACCOUNTS")
+PREFUND_MULTIPLIER = env_int("PREFUND_MULTIPLIER")
+TX_PER_SEC = env_int("TX_PER_SEC")
+GAS_UPDATE_INTERVAL = env_int("GAS_UPDATE_INTERVAL")
+BLOCK_UPDATE_INTERVAL = env_int("BLOCK_UPDATE_INTERVAL")
+TOKEN_TRANSFER_GAS_LIMIT = env_int("TOKEN_TRANSFER_GAS_LIMIT")
 
 
 def fund_accounts(accounts, current_gas_price, prefund_multiplier, tx_count_per_acount):
@@ -21,10 +21,12 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, tx_count_per_
     last_tx = ""
     for account in accounts:
         to_address = account.address
-        total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[account.private_key]
+        total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[
+            account.private_key]
         fund_ether_tx_hash = send_ether(
             funder.account, funder.get_use_nonce(), to_address, total_ether, current_gas_price)
-        fund_tokens_tx_hash = send_tokens(funder.account, funder.get_use_nonce(), to_address, tx_count_per_acount[account.private_key],
+        fund_tokens_tx_hash = send_tokens(funder.account, funder.get_use_nonce(), to_address,
+                                          tx_count_per_acount[account.private_key],
                                           current_gas_price)
         last_tx = fund_tokens_tx_hash
         log(f"funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash}", )
@@ -59,7 +61,7 @@ def do_load(txs, tx_per_sec, shared_gas_price, tx_writer):
         tx_time = int(time.time())
         frm, to = tx
         gas_price = shared_gas_price.value
-        tx_hash = send_tokens(frm.account, frm.get_use_nonce(), to.account.address, 1, gas_price,
+        tx_hash = send_tokens(frm.account, frm.get_use_nonce(), to.account.address, 1, int(gas_price),
                               TOKEN_TRANSFER_GAS_LIMIT)
         result = [tx_hash, str(tx_time), str(gas_price)]
         results.append(result)
@@ -78,7 +80,6 @@ def load_test(num_of_accounts,
               account_writer,
               tx_writer,
               block_writer):
-
     # generate random accounts
     log("generating accounts")
     accounts = [create_account() for _ in range(num_of_accounts)]
@@ -123,15 +124,12 @@ def load_test(num_of_accounts,
 
 
 if __name__ == "__main__":
-    arg = get_arg()
     now = now_str()
-
     tx_writer = CSVWriter(f"results/txs.{now}.csv", ["tx_hash", "timestamp", "gas_price"])
     block_writer = CSVWriter(f"results/blocks.{now}.csv", ["block_number", "block_timestamp", "my_timestamp", "delta"])
     account_writer = CSVWriter(f"results/accounts.{now}.csv", ["private_key", "address"])
-
-    load_test(TOTAL_ACCOUNTS,
-              TOTAL_DURATION,
+    load_test(TOTAL_TEST_ACCOUNTS,
+              TOTAL_TEST_DURATION_SEC,
               TX_PER_SEC,
               PREFUND_MULTIPLIER,
               THRESHOLD,
