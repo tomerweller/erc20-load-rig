@@ -24,7 +24,7 @@ def env_int(k, default=None):
     return int(env(k, default))
 
 
-CHAIN_ID = env('CHAIN_ID')
+CHAIN_ID = env_int('CHAIN_ID')
 GAS_PRICE = env_int('GAS_PRICE')
 GAS_LIMIT = env_int('GAS_LIMIT')
 
@@ -89,7 +89,7 @@ def create_account():
 
 def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
     tx = {
-        "from": from_account.address,
+        #"from": from_account.address,
         "to": to_address,
         "gas": GAS_LIMIT,
         "gasPrice": gas_price,
@@ -105,9 +105,9 @@ def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE):
 def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
     start = time.time()
     tx = {
-        "from": from_account.address,
+        #"from": from_account.address,
         "gas": gas_limit,
-        "gasPrice": gas_price,
+        #"gasPrice": gas_price,
         "chainId": CHAIN_ID,
         "nonce": nonce
     }
