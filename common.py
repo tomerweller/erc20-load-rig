@@ -135,6 +135,11 @@ def stringify_list(l):
     return [str(v) for v in l]
 
 
+def get_latest_block():
+    # return get_w3().eth.getBlock("latest")
+    return w3.eth.getBlock("latest")
+
+
 class CSVWriter:
     def __init__(self, path, cols):
         self.path = path
@@ -164,11 +169,14 @@ def log(m):
     logging.info(m)
 
 
-try:
-    w3 = Web3(IPCProvider(env("IPC_PROVIDER")))
-except KeyError:
-    w3 = Web3(HTTPProvider(env("HTTP_PROVIDER")))
+def get_w3():
+    try:
+        return Web3(IPCProvider(env("IPC_PROVIDER")))
+    except KeyError:
+        return Web3(HTTPProvider(env("HTTP_PROVIDER")))
 
+
+w3 = get_w3()
 to_hex = w3.toHex
 
 funder = AccountWrapper(env('FUNDER_PK'))
