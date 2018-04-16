@@ -126,13 +126,20 @@ def load_test(num_of_accounts,
     block_process.start()
 
     log("executing txs")
-    do_load(pre_txs, tx_per_sec, shared_gas_price, tx_writer)
+    tx_results = do_load(pre_txs, tx_per_sec, shared_gas_price, tx_writer)
+
+    log(f"killing gas monitor")
     gas_process.terminate()
 
+    log(f"waiting for last transaction to complete")
+    wait_for_tx(tx_results[-1][0])
+
     log(f"waiting additional 12 blocks")
-    final_block = get_latest_block().number + 36
+    final_block = get_latest_block().number + 12
     while get_latest_block().number <= final_block:
         time.sleep(GAS_UPDATE_INTERVAL)
+
+    log(f"killing block monitor")
     block_process.terminate()
 
 
