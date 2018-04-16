@@ -25,8 +25,6 @@ def env_int(k, default=None):
 
 
 CHAIN_ID = env_int('CHAIN_ID')
-GAS_PRICE = env_int('GAS_PRICE')
-GAS_LIMIT = env_int('GAS_LIMIT')
 
 
 def copy_shuffle(l):
@@ -87,7 +85,7 @@ def create_account():
     return AccountWrapper(Account.create().privateKey, 0)
 
 
-def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
+def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
     tx = {
         "to": to_address,
         "gas": gas_limit,
@@ -101,7 +99,7 @@ def send_ether(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_li
     return w3.toHex(result)
 
 
-def send_tokens(from_account, nonce, to_address, val, gas_price=GAS_PRICE, gas_limit=GAS_LIMIT):
+def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
     start = time.time()
     tx = {
         "gas": gas_limit,
