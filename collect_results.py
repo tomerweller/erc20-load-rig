@@ -5,13 +5,13 @@ NUM_OF_BLOCKS = 12
 
 def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
     with open(blocks_csv) as f:
-        blocks = [line.split(',') for line in f.read().splitlines()]
+        blocks = [line.split(',') for line in f.read().splitlines()[1:]]
     block_mem = {block[0]: (block[1], block[2]) for block in blocks}
 
     with open(tx_csv) as f:
-        lines = f.read().splitlines()
+        lines = f.read().splitlines()[1:]
 
-    header_row = ['tx_hash', 'submitted_at']
+    header_row = ['tx_hash', 'submitted_at', 'gas_price']
     for i in range(1, 1 + NUM_OF_BLOCKS):
         header_row.append(f'block{i}')
         header_row.append(f'my_block{i}')
@@ -37,4 +37,4 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
 
 
 if __name__ == "__main__":
-    collect_stats(get_arg(0), get_arg(1), f"results/tx.plus.{now_str()}.csv")
+    collect_stats(get_arg(0), get_arg(1), f"results/txs.plus.{now_str()}.csv")

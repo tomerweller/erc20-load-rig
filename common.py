@@ -174,6 +174,14 @@ def get_w3():
         return Web3(HTTPProvider(env("HTTP_PROVIDER")))
 
 
+def ether_to_wei(eth):
+    return w3.toWei(eth)
+
+
+def wei_to_ether(wei):
+    return w3.fromWei(wei, 'ether')
+
+
 w3 = get_w3()
 w3.eth.enable_unaudited_features()
 to_hex = w3.toHex
