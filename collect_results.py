@@ -15,7 +15,6 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
     for i in range(1, 1 + NUM_OF_BLOCKS):
         header_row.append(f'block{i}')
         header_row.append(f'my_block{i}')
-    header_row.append('gas_used')
 
     with open(tx_plus_csv, "w") as f:
         f.write(','.join(header_row)+"\n")
