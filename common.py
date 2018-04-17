@@ -139,6 +139,14 @@ def get_latest_block():
     return w3.eth.getBlock("latest")
 
 
+def get_block_robust(n):
+    while True:
+        try:
+            return w3.eth.getBlock(n)
+        except Timeout as e:
+            log(f"timeout in get_block_robust ({e}). retrying")
+
+
 class CSVWriter:
     def __init__(self, path, cols):
         self.path = path
