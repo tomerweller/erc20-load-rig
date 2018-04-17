@@ -8,6 +8,7 @@ from datetime import datetime
 
 import requests
 from web3 import Web3, Account, HTTPProvider, IPCProvider
+from web3.utils.threads import Timeout
 
 
 def env(k, default=None):
@@ -85,6 +86,14 @@ def create_account():
     return AccountWrapper(Account.create().privateKey, 0)
 
 
+def send_raw_tx(raw_tx):
+    while True:
+        try:
+            return w3.toHex(w3.eth.sendRawTransaction(raw_tx))
+        except Timeout as e:
+            log(f"timeout ({e}). retrying.")
+
+
 def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
     tx = {
         "to": to_address,
@@ -95,12 +104,10 @@ def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
         "nonce": nonce
     }
     signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
-    result = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-    return w3.toHex(result)
+    return send_raw_tx(signed_tx.rawTransaction)
 
 
 def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
-    start = time.time()
     tx = {
         "gas": gas_limit,
         "gasPrice": gas_price,
@@ -109,9 +116,7 @@ def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
     }
     tx = ERC20_CONTRACT.functions.transfer(to_address, val).buildTransaction(tx)
     signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
-    result = w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-    log(f"tx time: {time.time()-start}")
-    return w3.toHex(result)
+    return send_raw_tx(signed_tx.rawTransaction)
 
 
 def wait_for_tx(tx_hash):
