@@ -58,12 +58,15 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, pre_txs):
 def monitor_gas_price(threshold, gas_price, interval):
     log("starting gas updates")
     while True:
-        new_price = get_gas_price(threshold)
-        if new_price != gas_price.value:
-            log(f"gas price change: {gas_price.value} -> {new_price}")
-            gas_price.value = new_price
-        else:
-            log(f"gas price unchanged: {gas_price.value}")
+        try:
+            new_price = get_gas_price(threshold)
+            if new_price != gas_price.value:
+                log(f"gas price change: {gas_price.value} -> {new_price}")
+                gas_price.value = new_price
+            else:
+                log(f"gas price unchanged: {gas_price.value}")
+        except Exception as e:
+            log(f"exception fetching gas price : {e}")
         time.sleep(interval)
 
 

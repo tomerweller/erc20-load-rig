@@ -1,6 +1,6 @@
 import time
 from common import CSVWriter, log, now_str, get_w3
-
+from web3.utils.threads import Timeout
 INTERVAL = 0.1
 
 
@@ -11,18 +11,21 @@ def monitor_block_timestamps(csv_out, interval):
     w3 = get_w3()  # a hacky way to overcome sync issues with w3
     blocks = {}
     while True:
-        latest_block = w3.eth.getBlock("latest")
-        latest_block_number = latest_block.number
-        latest_block_timestamp = latest_block.timestamp
-        my_timestamp = int(time.time())
-        if latest_block_number not in blocks:
-            log(f"new block detected: {latest_block_number}")
-            blocks[latest_block_number] = latest_block_timestamp
-            row = [latest_block_number, latest_block_timestamp, my_timestamp, my_timestamp - latest_block_timestamp,
-                   len(latest_block.transactions)]
-            csv_out.append(row)
-            log(row)
-        time.sleep(interval)
+        try:
+            latest_block = w3.eth.getBlock("latest")
+            latest_block_number = latest_block.number
+            latest_block_timestamp = latest_block.timestamp
+            my_timestamp = int(time.time())
+            if latest_block_number not in blocks:
+                log(f"new block detected: {latest_block_number}")
+                blocks[latest_block_number] = latest_block_timestamp
+                row = [latest_block_number, latest_block_timestamp, my_timestamp, my_timestamp - latest_block_timestamp,
+                       len(latest_block.transactions)]
+                csv_out.append(row)
+                log(row)
+            time.sleep(interval)
+        except Timeout as e:
+            log(f"ignoring timeout (block monitor). {e}")
 
 
 if __name__ == "__main__":
