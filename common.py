@@ -91,7 +91,7 @@ def sign_send_tx(from_account, tx_dict):
     try:
         return w3.toHex(w3.eth.sendRawTransaction(signed_tx.rawTransaction))
     except Timeout as e:
-        log(f"timeout ({e}). retrying.")
+        log(f"timeout ({e}). weird but ignoring.")
         return w3.toHex(signed_tx.hash)
 
 
@@ -170,7 +170,7 @@ def log(m):
 
 def get_w3():
     try:
-        return Web3(IPCProvider(env("IPC_PROVIDER")))
+        return Web3(IPCProvider(env("IPC_PROVIDER"), timeout=2))
     except KeyError:
         log("No IPC provider. using HTTP provider")
         return Web3(HTTPProvider(env("HTTP_PROVIDER")))
