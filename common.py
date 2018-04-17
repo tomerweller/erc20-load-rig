@@ -86,12 +86,13 @@ def create_account():
     return AccountWrapper(Account.create().privateKey, 0)
 
 
-def send_raw_tx(raw_tx):
-    while True:
-        try:
-            return w3.toHex(w3.eth.sendRawTransaction(raw_tx))
-        except Timeout as e:
-            log(f"timeout ({e}). retrying.")
+def sign_send_tx(from_account, tx_dict):
+    signed_tx = w3.eth.account.signTransaction(tx_dict, from_account.privateKey)
+    try:
+        return w3.toHex(w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+    except Timeout as e:
+        log(f"timeout ({e}). retrying.")
+        return w3.toHex(signed_tx.hash)
 
 
 def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
@@ -103,8 +104,7 @@ def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
         "chainId": CHAIN_ID,
         "nonce": nonce
     }
-    signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
-    return send_raw_tx(signed_tx.rawTransaction)
+    return sign_send_tx(from_account, tx)
 
 
 def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
@@ -115,8 +115,7 @@ def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
         "nonce": nonce
     }
     tx = ERC20_CONTRACT.functions.transfer(to_address, val).buildTransaction(tx)
-    signed_tx = w3.eth.account.signTransaction(tx, from_account.privateKey)
-    return send_raw_tx(signed_tx.rawTransaction)
+    return sign_send_tx(from_account, tx)
 
 
 def wait_for_tx(tx_hash):
