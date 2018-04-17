@@ -11,7 +11,7 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
     with open(tx_csv) as f:
         lines = f.read().splitlines()[1:]
 
-    header_row = ['tx_hash', 'submitted_at', 'gas_price', 'gas_used']
+    header_row = ['tx_hash', 'submitted_at', 'gas_price', 'gas_used', 'block_number']
     for i in range(1, 1 + NUM_OF_BLOCKS):
         header_row.append(f'block{i}')
         header_row.append(f'my_block{i}')
@@ -23,8 +23,9 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
         data = line.split(',')
         tx_hash = data[0]
         tx = w3.eth.getTransactionReceipt(tx_hash)
-        if tx:
+        if tx and tx.blockNumber:
             data.append(str(tx.gasUsed))
+            data.append(str(tx.blockNumber))
             for block_number in range(tx.blockNumber, tx.blockNumber + NUM_OF_BLOCKS):
                 if str(block_number) in block_mem:
                     data.append(block_mem[str(block_number)][0])
