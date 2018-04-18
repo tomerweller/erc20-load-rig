@@ -1,4 +1,4 @@
-from common import w3, get_arg, now_str, get_block_robust
+from common import w3, get_arg, now_str, get_block
 
 NUM_OF_BLOCKS = 12
 
@@ -13,7 +13,7 @@ class BlockCache:
         k = str(block_number)
         if k in self.block_mem:
             return self.block_mem[k]
-        self.block_mem[k] = (str(get_block_robust(block_number).timestamp), '')
+        self.block_mem[k] = (str(get_block(block_number).timestamp), '')
         return self.block_mem[k]
 
 

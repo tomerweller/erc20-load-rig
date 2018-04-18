@@ -4,7 +4,7 @@ from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps
 
 from common import send_tokens, now_str, get_gas_price, create_account, send_ether, funder, log, wait_for_tx, CSVWriter, \
-    get_latest_block, env, env_int, wei_to_ether, ether_to_wei
+    get_latest_block, env, env_int, wei_to_ether
 
 THRESHOLD = env("THRESHOLD")
 TOTAL_TEST_DURATION_SEC = env_int("TOTAL_TEST_DURATION_SEC")
@@ -85,7 +85,7 @@ def do_load(txs, tx_per_sec, shared_gas_price, tx_writer):
         gas_price = shared_gas_price.value
         tx_hash = send_tokens(frm.account, frm.get_use_nonce(), to.account.address, 1, int(gas_price),
                               TOKEN_TRANSFER_GAS_LIMIT)
-        result = [tx_hash, str(tx_time), str(gas_price)]
+        result = [frm.account.address, tx_hash, str(tx_time), str(gas_price)]
         results.append(result)
         log(result)
         tx_writer.append(result)
@@ -148,7 +148,7 @@ def load_test(num_of_accounts,
 
 if __name__ == "__main__":
     now = now_str()
-    tx_writer = CSVWriter(f"results/txs.{now}.csv", ["tx_hash", "timestamp", "gas_price"])
+    tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "tx_hash", "timestamp", "gas_price"])
     block_writer = CSVWriter(f"results/blocks.{now}.csv", ["block_number", "block_timestamp", "my_timestamp", "delta"])
     account_writer = CSVWriter(f"results/accounts.{now}.csv", ["private_key", "address"])
     load_test(TOTAL_TEST_ACCOUNTS,

@@ -1,7 +1,6 @@
 import logging
 import sys
 import os
-import random
 import math
 import time
 from datetime import datetime
@@ -28,12 +27,6 @@ def env_int(k, default=None):
 CHAIN_ID = env_int('CHAIN_ID')
 
 
-def copy_shuffle(l):
-    new_l = l[:]
-    random.shuffle(new_l)
-    return new_l
-
-
 def now_str():
     return datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
 
@@ -42,21 +35,6 @@ def get_arg(i=0):
     if len(sys.argv) < (2 + i):
         raise Exception(f"expected at least {i+1} command line argument/s")
     return sys.argv[1 + i]
-
-
-class CheapRandomIterator:
-    """An iterator that consumes elements in a random order. shuffle. repeat.
-    Ensures predictable $$$ consumption
-    """
-
-    def __init__(self, elements):
-        self.elements = elements
-        self.work_set = copy_shuffle(elements)
-
-    def next(self):
-        if not self.work_set:
-            self.work_set = copy_shuffle(self.elements[:])
-        return self.work_set.pop()
 
 
 class AccountWrapper:
@@ -91,7 +69,7 @@ def sign_send_tx(from_account, tx_dict):
     try:
         return w3.toHex(w3.eth.sendRawTransaction(signed_tx.rawTransaction))
     except Timeout as e:
-        log(f"timeout ({e}). weird but ignoring.")
+        log(f"ipc timeout ({e}). ignoring.")
         return w3.toHex(signed_tx.hash)
 
 
@@ -135,16 +113,35 @@ def stringify_list(l):
     return [str(v) for v in l]
 
 
+def ignore_timeouts(f):
+    def wrapper(*args, **kw):
+        while True:
+            try:
+                return f(*args, **kw)
+            except Timeout as e:
+                log(f"timeout in {f.__name__} ({e}). retrying")
+
+    return wrapper
+
+
+@ignore_timeouts
+def get_block(n):
+    return w3.eth.getBlock(n)
+
+
+@ignore_timeouts
 def get_latest_block():
     return w3.eth.getBlock("latest")
 
 
-def get_block_robust(n):
-    while True:
-        try:
-            return w3.eth.getBlock(n)
-        except Timeout as e:
-            log(f"timeout in get_block_robust ({e}). retrying")
+@ignore_timeouts
+def get_transaction_count(address):
+    return w3.eth.getTransactionCount(address)
+
+
+@ignore_timeouts
+def get_balance(address):
+    return w3.eth.getBalance(address)
 
 
 class CSVWriter:
