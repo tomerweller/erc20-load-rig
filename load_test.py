@@ -33,7 +33,7 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, pre_txs):
     start_balance = funder.balance()
     log(f"current funder balance is {wei_to_ether(start_balance)}")
 
-    last_tx = ""
+    funding_txs = []
     for i, account in enumerate(accounts):
         to_address = account.address
         total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[
@@ -43,12 +43,15 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, pre_txs):
         fund_tokens_tx_hash = send_tokens(funder.account, funder.get_use_nonce(), to_address,
                                           tx_count_per_acount[account.private_key], current_gas_price,
                                           INITIAL_TOKEN_TRANSFER_GAS_LIMIT)
-        last_tx = fund_tokens_tx_hash
-        log(f"({i}/{len(accounts)}) funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash}")
+        funding_txs.append(fund_ether_tx_hash)
+        funding_txs.append(fund_tokens_tx_hash)
+        log(f"funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash} ({i}/{len(accounts)})")
         time.sleep(1)  # for sanity
 
-    log("waiting for funding transactions to complete")
-    wait_for_tx(last_tx)
+    for i, tx_hash in enumerate(funding_txs):
+        log(f"waiting for tx {tx_hash} to complete. ({i}/{len(funding_txs)})")
+        wait_for_tx(tx_hash)
+
     final_balance = funder.balance()
     log(f"new funder balance : {wei_to_ether(final_balance)}")
     log(f"total spent: {wei_to_ether(start_balance-final_balance)}")
@@ -135,8 +138,9 @@ def load_test(num_of_accounts,
     gas_process.terminate()
 
     for i, tx_result in enumerate(tx_results):
-        log(f"waiting for transaction {i}/{len(tx_results)} to complete")
-        wait_for_tx(tx_result[2])
+        tx_hash = tx_result[2]
+        log(f"waiting for transaction {tx_hash} ({i}/{len(tx_results)}) to complete")
+        wait_for_tx(tx_hash)
 
     log(f"waiting additional 12 blocks")
     final_block = get_latest_block().number + 12
@@ -150,16 +154,16 @@ def load_test(num_of_accounts,
 if __name__ == "__main__":
     now = now_str()
     tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "to", "tx_hash", "timestamp", "gas_price"])
-    block_writer = CSVWriter(f"results/blocks.{now}.csv",
-                                 ["block_number",
-                                  "block_timestamp",
-                                  "my_timestamp",
-                                  "timestamp_delta",
-                                  "tx_count",
-                                  "avg_gas_price",
-                                  "median_gas_price",
-                                  "q5_gas_price",
-                                  "q95_gas_price"])
+    block_writer = CSVWriter(
+        f"results/blocks.{now}.csv", ["block_number",
+                                      "block_timestamp",
+                                      "my_timestamp",
+                                      "timestamp_delta",
+                                      "tx_count",
+                                      "avg_gas_price",
+                                      "median_gas_price",
+                                      "q5_gas_price",
+                                      "q95_gas_price"])
     account_writer = CSVWriter(f"results/accounts.{now}.csv", ["private_key", "address"])
     load_test(TOTAL_TEST_ACCOUNTS,
               TOTAL_TEST_DURATION_SEC,
