@@ -1,10 +1,11 @@
-from common import w3, get_arg, now_str, get_block, wei_to_gwei
+from common import get_arg, now_str, get_env_connection
 
 NUM_OF_BLOCKS = 12
 
 
 class BlockCache:
-    def __init__(self, blocks_csv):
+    def __init__(self, conn, blocks_csv):
+        self.conn = conn
         with open(blocks_csv) as f:
             blocks = [line.split(',') for line in f.read().splitlines()[1:]]
         self.block_mem = {block[0]: (block[1], block[2]) for block in blocks}
@@ -13,12 +14,13 @@ class BlockCache:
         k = str(block_number)
         if k in self.block_mem:
             return self.block_mem[k]
-        self.block_mem[k] = (str(get_block(block_number).timestamp), '')
+        self.block_mem[k] = (str(self.conn.get_block(block_number).timestamp), '')
         return self.block_mem[k]
 
 
 def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
-    block_cache = BlockCache(blocks_csv)
+    conn = get_env_connection()
+    block_cache = BlockCache(conn, blocks_csv)
     with open(tx_csv) as f:
         lines = f.read().splitlines()[1:]
 
@@ -34,7 +36,7 @@ def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
     for line in lines:
         data = line.split(',')
         tx_hash = data[2]
-        tx = w3.eth.getTransactionReceipt(tx_hash)
+        tx = conn.get_transaction_receipt(tx_hash)
         if tx and tx.blockNumber:
             data.append(str(tx.gasUsed))
             data.append(str(tx.blockNumber))

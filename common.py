@@ -4,11 +4,16 @@ import os
 import math
 import time
 import numpy as np
+
+from collections import namedtuple
 from datetime import datetime
 
 import requests
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 from web3.utils.threads import Timeout
+
+from eth_utils.conversions import to_hex
+from eth_utils import from_wei, to_wei
 
 
 def env(k, default=None):
@@ -25,9 +30,6 @@ def env_int(k, default=None):
     return int(env(k, default))
 
 
-CHAIN_ID = env_int('CHAIN_ID')
-
-
 def now_str():
     return datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
 
@@ -36,86 +38,6 @@ def get_arg(i=0):
     if len(sys.argv) < (2 + i):
         raise Exception(f"expected at least {i+1} command line argument/s")
     return sys.argv[1 + i]
-
-
-class AccountWrapper:
-    """Wrap around account and nonce. nonce is tracked in memory after initialization."""
-
-    def __init__(self, private_key, nonce=None):
-        self.account = Account.privateKeyToAccount(private_key)
-        self.nonce = w3.eth.getTransactionCount(self.account.address) if nonce is None else nonce
-
-    @property
-    def address(self):
-        return self.account.address
-
-    @property
-    def private_key(self):
-        return to_hex(self.account.privateKey)
-
-    def get_use_nonce(self):
-        self.nonce += 1
-        return self.nonce - 1
-
-    def balance(self):
-        return w3.eth.getBalance(self.account.address)
-
-
-def create_account():
-    return AccountWrapper(Account.create().privateKey, 0)
-
-
-def sign_send_tx(from_account, tx_dict):
-    signed_tx = w3.eth.account.signTransaction(tx_dict, from_account.privateKey)
-    try:
-        return w3.toHex(w3.eth.sendRawTransaction(signed_tx.rawTransaction))
-    except Timeout as e:
-        log(f"ipc timeout ({e}). ignoring.")
-        return w3.toHex(signed_tx.hash)
-
-
-def send_ether(from_account, nonce, to_address, val, gas_price, gas_limit):
-    tx = {
-        "to": to_address,
-        "gas": gas_limit,
-        "gasPrice": gas_price,
-        "value": val,
-        "chainId": CHAIN_ID,
-        "nonce": nonce
-    }
-    return sign_send_tx(from_account, tx)
-
-
-def send_tokens(from_account, nonce, to_address, val, gas_price, gas_limit):
-    tx = {
-        "gas": gas_limit,
-        "gasPrice": gas_price,
-        "chainId": CHAIN_ID,
-        "nonce": nonce
-    }
-    tx = ERC20_CONTRACT.functions.transfer(to_address, val).buildTransaction(tx)
-    return sign_send_tx(from_account, tx)
-
-
-def wait_for_tx(tx_hash):
-    while True:
-        tx = w3.eth.getTransactionReceipt(tx_hash)
-        if tx and tx.blockNumber:
-            return
-        time.sleep(1)
-
-
-def get_gas_price(threshold):
-    r = requests.get('https://ethgasstation.info/json/ethgasAPI.json')
-    return int(r.json()[threshold] * math.pow(10, 8))
-
-
-def get_gas_price_low():
-    return get_gas_price("safeLow")
-
-
-def stringify_list(l):
-    return [str(v) for v in l]
 
 
 def ignore_timeouts(f):
@@ -129,24 +51,57 @@ def ignore_timeouts(f):
     return wrapper
 
 
-@ignore_timeouts
-def get_block(n):
-    return w3.eth.getBlock(n)
+class CSVWriter:
+    def __init__(self, path, cols):
+        self.path = path
+        self.cols = cols
+        with open(path, "w") as csv_file:
+            csv_file.write(",".join(cols) + "\n")
+
+    def append(self, row):
+        assert len(row) == len(self.cols)
+        with open(self.path, "a+") as csv_file:
+            csv_file.write(",".join(stringify_list(row)) + "\n")
+
+    def append_all(self, rows):
+        with open(self.path, "a+") as csv_file:
+            csv_file.write('\n'.join([",".join(stringify_list(row)) for row in rows]) + "\n")
 
 
-@ignore_timeouts
-def get_latest_block():
-    return w3.eth.getBlock("latest")
+def setup_logging():
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    root.addHandler(ch)
 
 
-@ignore_timeouts
-def get_transaction_count(address):
-    return w3.eth.getTransactionCount(address)
+setup_logging()
 
 
-@ignore_timeouts
-def get_balance(address):
-    return w3.eth.getBalance(address)
+def log(m):
+    logging.info(m)
+
+
+def ether_to_wei(eth):
+    return to_wei(eth, "ether")
+
+
+def wei_to_ether(wei):
+    return from_wei(wei, 'ether')
+
+
+def wei_to_gwei(wei):
+    return float(from_wei(wei, 'gwei'))
+
+
+def stringify_list(l):
+    return [str(v) for v in l]
+
+
+BlockStats = namedtuple('BlockStats', 'tx_count avg_gas_price median_gas_price q5_gas_price q95_gas_price')
 
 
 def weighted_quantile(values, quantiles, sample_weight):
@@ -172,62 +127,140 @@ def weighted_quantile(values, quantiles, sample_weight):
     return np.interp(quantiles, weighted_quantiles, values)
 
 
-class CSVWriter:
-    def __init__(self, path, cols):
-        self.path = path
-        self.cols = cols
-        with open(path, "w") as csv_file:
-            csv_file.write(",".join(cols) + "\n")
+class AccountWrapper:
+    """Wrap around account and nonce. nonce is tracked in memory after initialization."""
 
-    def append(self, row):
-        assert len(row) == len(self.cols)
-        with open(self.path, "a+") as csv_file:
-            csv_file.write(",".join(stringify_list(row)) + "\n")
+    def __init__(self, conn, private_key, nonce=None):
+        self.conn = conn
+        self.account = Account.privateKeyToAccount(private_key)
+        self.nonce = conn.get_transaction_count(self.account.address) if nonce is None else nonce
 
-    def append_all(self, rows):
-        with open(self.path, "a+") as csv_file:
-            csv_file.write('\n'.join([",".join(stringify_list(row)) for row in rows]) + "\n")
+    @property
+    def address(self):
+        return self.account.address
 
+    @property
+    def private_key(self):
+        return to_hex(self.account.privateKey)
 
-root = logging.getLogger()
-root.setLevel(logging.DEBUG)
-ch = logging.StreamHandler(sys.stdout)
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-root.addHandler(ch)
+    def get_use_nonce(self):
+        self.nonce += 1
+        return self.nonce - 1
+
+    def balance(self):
+        return self.conn.get_balance(self.account.address)
 
 
-def log(m):
-    logging.info(m)
+class Connection:
+    def __init__(self, chain_id, rpc_provider, erc20_address, erc20_abi):
+        self.chain_id = chain_id
+        self.w3 = Web3(rpc_provider)
+        self.w3.eth.enable_unaudited_features()
+        self.contract = self.w3.eth.contract(address=erc20_address, abi=erc20_abi)
+
+    def create_account(self):
+        return AccountWrapper(self, Account.create().privateKey, 0)
+
+    def sign_send_tx(self, from_account, tx_dict):
+        signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.privateKey)
+        try:
+            return to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+        except Timeout as e:
+            log(f"ipc timeout ({e}). ignoring.")
+            return to_hex(signed_tx.hash)
+
+    def send_ether(self, from_account, nonce, to_address, val, gas_price, gas_limit):
+        tx = {
+            "to": to_address,
+            "gas": gas_limit,
+            "gasPrice": gas_price,
+            "value": val,
+            "chainId": self.chain_id,
+            "nonce": nonce
+        }
+        return self.sign_send_tx(from_account, tx)
+
+    def send_tokens(self, from_account, nonce, to_address, val, gas_price, gas_limit):
+        tx = {
+            "gas": gas_limit,
+            "gasPrice": gas_price,
+            "chainId": self.chain_id,
+            "nonce": nonce
+        }
+        tx = self.contract.functions.transfer(to_address, val).buildTransaction(tx)
+        return self.sign_send_tx(from_account, tx)
+
+    def wait_for_tx(self, tx_hash):
+        while True:
+            tx = self.w3.eth.getTransactionReceipt(tx_hash)
+            if tx and tx.blockNumber:
+                return
+            time.sleep(1)
+
+    def contract(self, address, abi):
+        return self.w3.eth.contract(address=address, abi=abi)
+
+    @ignore_timeouts
+    def get_block(self, n):
+        return self.w3.eth.getBlock(n)
+
+    @ignore_timeouts
+    def get_latest_block(self):
+        return self.w3.eth.getBlock("latest")
+
+    @ignore_timeouts
+    def get_transaction(self, tx_hash):
+        return self.w3.eth.getTransaction(tx_hash)
+
+    @ignore_timeouts
+    def get_transaction_receipt(self, tx_hash):
+        return self.w3.eth.getTransactionReceipt(tx_hash)
+
+    @ignore_timeouts
+    def get_transaction_count(self, address):
+        return self.w3.eth.getTransactionCount(address)
+
+    @ignore_timeouts
+    def get_balance(self, address):
+        return self.w3.eth.getBalance(address)
 
 
-def get_w3():
+    @ignore_timeouts
+    def get_block_stats(self, block):
+        txs = [self.get_transaction(tx_hash) for tx_hash in block.transactions]
+        if len(txs) == 0:
+            return BlockStats(0, 0, 0, 0, 0)
+        gas_prices = [wei_to_gwei(tx.gasPrice) for tx in txs]
+        gas_usages = [tx.gas for tx in txs]
+        avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)]) / sum(gas_usages)
+        median_gas_price, q5_gas_price, q95_gas_price = weighted_quantile(gas_prices, [0.5, 0.05, 0.95], gas_usages)
+        return BlockStats(tx_count=len(block.transactions),
+                          avg_gas_price=avg_gas_price,
+                          median_gas_price=median_gas_price,
+                          q5_gas_price=q5_gas_price,
+                          q95_gas_price=q95_gas_price)
+
+
+def get_gas_price(threshold):
+    r = requests.get('https://ethgasstation.info/json/ethgasAPI.json')
+    return int(r.json()[threshold] * math.pow(10, 8))
+
+
+def get_gas_price_low():
+    return get_gas_price("safeLow")
+
+
+def get_env_connection():
+    chain_id = env_int('CHAIN_ID')
     try:
-        return Web3(IPCProvider(env("IPC_PROVIDER"), timeout=2))
+        rpc_provider = IPCProvider(env("IPC_PROVIDER"), timeout=2)
     except KeyError:
-        log("No IPC provider. using HTTP provider")
-        return Web3(HTTPProvider(env("HTTP_PROVIDER")))
+        rpc_provider = HTTPProvider(env("HTTP_PROVIDER"))
+    with open(env('ERC20_ABI_PATH'), 'r') as myfile:
+        erc20_abi = myfile.read().replace('\n', '')
+    erc20_address = env('ERC20_ADDRESS')
+    return Connection(chain_id=chain_id, rpc_provider=rpc_provider, erc20_abi=erc20_abi, erc20_address=erc20_address)
 
 
-def ether_to_wei(eth):
-    return w3.toWei(eth)
-
-
-def wei_to_ether(wei):
-    return w3.fromWei(wei, 'ether')
-
-
-def wei_to_gwei(wei):
-    return float(w3.fromWei(wei, 'gwei'))
-
-
-w3 = get_w3()
-w3.eth.enable_unaudited_features()
-to_hex = w3.toHex
-
-funder = AccountWrapper(env('FUNDER_PK'))
-
-# contract
-with open(env('ERC20_ABI_PATH'), 'r') as myfile:
-    ERC20_CONTRACT = w3.eth.contract(address=env('ERC20_ADDRESS'), abi=myfile.read().replace('\n', ''))
+def get_env_funder(conn):
+    return AccountWrapper(conn, env('FUNDER_PK'))
