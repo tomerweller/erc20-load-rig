@@ -110,6 +110,10 @@ def get_gas_price(threshold):
     return int(r.json()[threshold] * math.pow(10, 8))
 
 
+def get_gas_price_low():
+    return get_gas_price("safeLow")
+
+
 def stringify_list(l):
     return [str(v) for v in l]
 
