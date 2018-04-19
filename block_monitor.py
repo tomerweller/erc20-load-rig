@@ -16,7 +16,7 @@ def get_block_stats(w3, block):
         return BlockStats(0, 0, 0, 0, 0)
     gas_prices = [wei_to_gwei(tx.gasPrice) for tx in txs]
     gas_usages = [tx.gas for tx in txs]
-    avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)])
+    avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)])/sum(gas_usages)
     median_gas_price, q5_gas_price, q95_gas_price = weighted_quantile(gas_prices, [0.5, 0.05, 0.95], gas_usages)
     return BlockStats(tx_count=len(block.transactions),
                       avg_gas_price=avg_gas_price,
