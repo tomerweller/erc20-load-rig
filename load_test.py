@@ -85,10 +85,10 @@ def do_load(txs, tx_per_sec, shared_gas_price, tx_writer):
         gas_price = shared_gas_price.value
         tx_hash = send_tokens(frm.account, frm.get_use_nonce(), to.account.address, 1, int(gas_price),
                               TOKEN_TRANSFER_GAS_LIMIT)
-        result = [frm.account.address, tx_hash, str(tx_time), str(gas_price)]
-        results.append(result)
-        log(result)
-        tx_writer.append(result)
+        row = [frm.account.address, to.account.address, tx_hash, str(tx_time), str(gas_price)]
+        log(row)
+        results.append(row)
+        tx_writer.append(row)
 
     log(f"total load duration {time.time()-start_time}")
     return results
@@ -135,7 +135,7 @@ def load_test(num_of_accounts,
     gas_process.terminate()
 
     log(f"waiting for last transaction to complete")
-    wait_for_tx(tx_results[-1][0])
+    wait_for_tx(tx_results[-1][2])
 
     log(f"waiting additional 12 blocks")
     final_block = get_latest_block().number + 12
@@ -148,8 +148,17 @@ def load_test(num_of_accounts,
 
 if __name__ == "__main__":
     now = now_str()
-    tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "tx_hash", "timestamp", "gas_price"])
-    block_writer = CSVWriter(f"results/blocks.{now}.csv", ["block_number", "block_timestamp", "my_timestamp", "delta"])
+    tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "to", "tx_hash", "timestamp", "gas_price"])
+    block_writer = CSVWriter(f"results/blocks.{now}.csv",
+                                 ["block_number",
+                                  "block_timestamp",
+                                  "my_timestamp",
+                                  "timestamp_delta",
+                                  "tx_count",
+                                  "avg_gas_price",
+                                  "median_gas_price",
+                                  "q5_gas_price",
+                                  "q95_gas_price"])
     account_writer = CSVWriter(f"results/accounts.{now}.csv", ["private_key", "address"])
     load_test(TOTAL_TEST_ACCOUNTS,
               TOTAL_TEST_DURATION_SEC,

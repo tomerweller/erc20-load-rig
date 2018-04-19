@@ -3,11 +3,13 @@ import sys
 import os
 import math
 import time
+import numpy as np
 from datetime import datetime
 
 import requests
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 from web3.utils.threads import Timeout
+from collections import namedtuple
 
 
 def env(k, default=None):
@@ -144,6 +146,29 @@ def get_balance(address):
     return w3.eth.getBalance(address)
 
 
+def weighted_quantile(values, quantiles, sample_weight):
+    """ Very close to numpy.percentile, but supports weights.
+    NOTE: quantiles should be in [0, 1]!
+    :param values: numpy.array with data
+    :param quantiles: array-like with many quantiles needed
+    :param sample_weight: array-like of the same length as `array`
+    :return: numpy.array with computed quantiles.
+    """
+
+    values = np.array(values)
+    quantiles = np.array(quantiles)
+    sample_weight = np.array(sample_weight)
+    assert np.all(quantiles >= 0) and np.all(quantiles <= 1), 'quantiles should be in [0, 1]'
+
+    sorter = np.argsort(values)
+    values = values[sorter]
+    sample_weight = sample_weight[sorter]
+
+    weighted_quantiles = np.cumsum(sample_weight) - 0.5 * sample_weight
+    weighted_quantiles /= np.sum(sample_weight)
+    return np.interp(quantiles, weighted_quantiles, values)
+
+
 class CSVWriter:
     def __init__(self, path, cols):
         self.path = path
@@ -152,6 +177,7 @@ class CSVWriter:
             csv_file.write(",".join(cols) + "\n")
 
     def append(self, row):
+        assert len(row) == len(self.cols)
         with open(self.path, "a+") as csv_file:
             csv_file.write(",".join(stringify_list(row)) + "\n")
 
@@ -187,6 +213,10 @@ def ether_to_wei(eth):
 
 def wei_to_ether(wei):
     return w3.fromWei(wei, 'ether')
+
+
+def wei_to_gwei(wei):
+    return float(w3.fromWei(wei, 'gwei'))
 
 
 w3 = get_w3()
