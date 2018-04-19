@@ -34,7 +34,7 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, pre_txs):
     log(f"current funder balance is {wei_to_ether(start_balance)}")
 
     last_tx = ""
-    for account in accounts:
+    for i, account in enumerate(accounts):
         to_address = account.address
         total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[
             account.private_key]
@@ -44,7 +44,7 @@ def fund_accounts(accounts, current_gas_price, prefund_multiplier, pre_txs):
                                           tx_count_per_acount[account.private_key], current_gas_price,
                                           INITIAL_TOKEN_TRANSFER_GAS_LIMIT)
         last_tx = fund_tokens_tx_hash
-        log(f"funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash}", )
+        log(f"({i}/{len(accounts)}) funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash}")
         time.sleep(1)  # for sanity
 
     log("waiting for funding transactions to complete")
@@ -134,8 +134,9 @@ def load_test(num_of_accounts,
     log(f"killing gas monitor")
     gas_process.terminate()
 
-    log(f"waiting for last transaction to complete")
-    wait_for_tx(tx_results[-1][2])
+    for i, tx_result in enumerate(tx_results):
+        log(f"waiting for transaction {i}/{len(tx_results)} to complete")
+        wait_for_tx(tx_result[2])
 
     log(f"waiting additional 12 blocks")
     final_block = get_latest_block().number + 12

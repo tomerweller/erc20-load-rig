@@ -9,7 +9,6 @@ from datetime import datetime
 import requests
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 from web3.utils.threads import Timeout
-from collections import namedtuple
 
 
 def env(k, default=None):
