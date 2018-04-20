@@ -205,6 +205,14 @@ class Connection:
         return self.w3.eth.getBlock(n)
 
     @ignore_timeouts
+    def get_block_wait(self, n, interval=1):
+        while True:
+            block = self.get_block(n)
+            if block and block.number:
+                return block
+            time.sleep(interval)
+
+    @ignore_timeouts
     def get_latest_block(self):
         return self.w3.eth.getBlock("latest")
 
