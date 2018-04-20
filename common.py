@@ -68,6 +68,13 @@ class CSVWriter:
             csv_file.write('\n'.join([",".join(stringify_list(row)) for row in rows]) + "\n")
 
 
+def csv_reader(path, ntuple):
+    with open(path) as f:
+        rows = f.read().splitlines()[1:]
+
+    return [ntuple(*row.split(',')) for row in rows]
+
+
 def setup_logging():
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
@@ -129,6 +136,7 @@ def weighted_quantile(values, quantiles, sample_weight):
 
 class AccountWrapper:
     """Wrap around account and nonce. nonce is tracked in memory after initialization."""
+
     def __init__(self, private_key, nonce):
         self.w3account, = Account.privateKeyToAccount(private_key),
         self._nonce = nonce
