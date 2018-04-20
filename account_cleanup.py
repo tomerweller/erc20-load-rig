@@ -18,15 +18,15 @@ def cleanup(csv_in):
     gas_limit = 21000
 
     log(f"using gas price: {gas_price}, gas limit: {gas_limit}")
-    accounts = [AccountWrapper(conn, line.split(',')[0]) for line in lines[1:]]
+    accounts = [conn.get_account(line.split(',')[0]) for line in lines[1:]]
 
     for i, account in enumerate(accounts):
         log(f"cleaning up {account.address} ({i}/{len(accounts)})")
-        balance = account.balance()
+        balance = conn.get_balance(account.address)
         if balance >= gas_limit * gas_price:
-            tx_hash = conn.send_ether(account.account, account.get_use_nonce(), funder.address,
+            tx_hash = conn.send_ether(account, account.get_use_nonce(), funder.address,
                                       balance - gas_limit * gas_price, gas_price, gas_limit)
-            log(f"{account.account.address}, {balance}, {tx_hash}")
+            log(f"{account.address}, {balance}, {tx_hash}")
         else:
             log(f"balance too low: {balance}")
         time.sleep(INTERVAL)

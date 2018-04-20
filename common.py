@@ -129,26 +129,25 @@ def weighted_quantile(values, quantiles, sample_weight):
 
 class AccountWrapper:
     """Wrap around account and nonce. nonce is tracked in memory after initialization."""
-
-    def __init__(self, conn, private_key, nonce=None):
-        self.conn = conn
-        self.account = Account.privateKeyToAccount(private_key)
-        self.nonce = conn.get_transaction_count(self.account.address) if nonce is None else nonce
+    def __init__(self, private_key, nonce):
+        self.w3account, = Account.privateKeyToAccount(private_key),
+        self._nonce = nonce
 
     @property
     def address(self):
-        return self.account.address
+        return self.w3account.address
 
     @property
     def private_key(self):
-        return to_hex(self.account.privateKey)
+        return to_hex(self.w3account.privateKey)
 
     def get_use_nonce(self):
-        self.nonce += 1
-        return self.nonce - 1
+        self._nonce += 1
+        return self._nonce - 1
 
-    def balance(self):
-        return self.conn.get_balance(self.account.address)
+
+def create_account():
+    return AccountWrapper(Account.create().privateKey, 0)
 
 
 class Connection:
@@ -158,11 +157,12 @@ class Connection:
         self.w3.eth.enable_unaudited_features()
         self.contract = self.w3.eth.contract(address=erc20_address, abi=erc20_abi)
 
-    def create_account(self):
-        return AccountWrapper(self, Account.create().privateKey, 0)
+    def get_account(self, private_key):
+        w3acc = Account.privateKeyToAccount(private_key)
+        return AccountWrapper(private_key, self.get_transaction_count(w3acc.address))
 
     def sign_send_tx(self, from_account, tx_dict):
-        signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.privateKey)
+        signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.private_key)
         try:
             return to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
         except Timeout as e:
@@ -224,7 +224,6 @@ class Connection:
     def get_balance(self, address):
         return self.w3.eth.getBalance(address)
 
-
     @ignore_timeouts
     def get_block_stats(self, block):
         txs = [self.get_transaction(tx_hash) for tx_hash in block.transactions]
@@ -232,7 +231,8 @@ class Connection:
             return BlockStats(0, 0, 0, 0, 0)
         gas_prices = [wei_to_gwei(tx.gasPrice) for tx in txs]
         gas_usages = [tx.gas for tx in txs]
-        avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)]) / sum(gas_usages)
+        avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)]) / sum(
+            gas_usages)
         median_gas_price, q5_gas_price, q95_gas_price = weighted_quantile(gas_prices, [0.5, 0.05, 0.95], gas_usages)
         return BlockStats(tx_count=len(block.transactions),
                           avg_gas_price=avg_gas_price,
@@ -263,4 +263,4 @@ def get_env_connection():
 
 
 def get_env_funder(conn):
-    return AccountWrapper(conn, env('FUNDER_PK'))
+    return conn.get_account(env('FUNDER_PK'))

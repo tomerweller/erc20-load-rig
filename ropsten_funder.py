@@ -19,8 +19,7 @@ def main():
                 time.sleep(1)
             print("\nfunder balance: " + str(funder.balance()))
             gas_price = get_gas_price("fastest")
-            tx_hash = conn.send_ether(tmp.account, 0,
-                                      funder.account.address, r.json()["amount"] - gas_price * GAS_LIMIT,
+            tx_hash = conn.send_ether(tmp.account, 0, funder.address, r.json()["amount"] - gas_price * GAS_LIMIT,
                                       gas_price, GAS_LIMIT)
             print(tmp.account.address, tx_hash)
         else:

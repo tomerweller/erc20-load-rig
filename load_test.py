@@ -4,7 +4,7 @@ from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps
 
 from common import now_str, get_gas_price, log, CSVWriter, env, env_int, wei_to_ether, get_env_connection, \
-    get_env_funder
+    get_env_funder, create_account
 
 THRESHOLD = env("THRESHOLD")
 TOTAL_TEST_DURATION_SEC = env_int("TOTAL_TEST_DURATION_SEC")
@@ -30,7 +30,7 @@ def fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier,
                ether_per_tx * len(pre_txs)
     log(f"funding {len(accounts)} accounts with a total of ~{wei_to_ether(expected)} ether")
     input("press enter to continue...")
-    start_balance = funder.balance()
+    start_balance = conn.get_balance(funder.address)
     log(f"current funder balance is {wei_to_ether(start_balance)}")
 
     funding_txs = []
@@ -38,9 +38,9 @@ def fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier,
         to_address = account.address
         total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[
             account.private_key]
-        fund_ether_tx_hash = conn.send_ether(funder.account, funder.get_use_nonce(), to_address, total_ether,
+        fund_ether_tx_hash = conn.send_ether(funder, funder.get_use_nonce(), to_address, total_ether,
                                              current_gas_price, ETHER_TRANSFER_GAS_LIMIT)
-        fund_tokens_tx_hash = conn.send_tokens(funder.account, funder.get_use_nonce(), to_address,
+        fund_tokens_tx_hash = conn.send_tokens(funder, funder.get_use_nonce(), to_address,
                                                tx_count_per_acount[account.private_key], current_gas_price,
                                                INITIAL_TOKEN_TRANSFER_GAS_LIMIT)
         funding_txs.append(fund_ether_tx_hash)
@@ -52,7 +52,7 @@ def fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier,
         log(f"waiting for tx {tx_hash} to complete. ({i}/{len(funding_txs)})")
         conn.wait_for_tx(tx_hash)
 
-    final_balance = funder.balance()
+    final_balance = conn.get_balance(funder.address)
     log(f"new funder balance : {wei_to_ether(final_balance)}")
     log(f"total spent: {wei_to_ether(start_balance-final_balance)}")
     log(f"delta from estimate (wei): {expected-(start_balance-final_balance)}")
@@ -86,9 +86,8 @@ def do_load(conn, txs, tx_per_sec, shared_gas_price, tx_writer):
         tx_time = int(time.time())
         frm, to = tx
         gas_price = shared_gas_price.value
-        tx_hash = conn.send_tokens(frm.account, frm.get_use_nonce(), to.account.address, 1, int(gas_price),
-                                   TOKEN_TRANSFER_GAS_LIMIT)
-        row = [frm.account.address, to.account.address, tx_hash, str(tx_time), str(gas_price)]
+        tx_hash = conn.send_tokens(frm, frm.get_use_nonce(), to.address, 1, int(gas_price), TOKEN_TRANSFER_GAS_LIMIT)
+        row = [frm.address, to.address, tx_hash, str(tx_time), str(gas_price)]
         log(row)
         results.append(row)
         tx_writer.append(row)
@@ -109,7 +108,7 @@ def load_test(conn,
               block_writer):
     # generate random accounts
     log("generating accounts")
-    accounts = [conn.create_account() for _ in range(num_of_accounts)]
+    accounts = [create_account() for _ in range(num_of_accounts)]
 
     # dump accounts
     log("dumping accounts to csv")
