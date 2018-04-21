@@ -4,7 +4,7 @@ from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps
 
 from common import now_str, get_gas_price, log, CSVWriter, env, env_int, wei_to_ether, get_env_connection, \
-    get_env_funder, create_account
+    get_env_funder, AccountCreator
 
 THRESHOLD = env("THRESHOLD")
 TOTAL_TEST_DURATION_SEC = env_int("TOTAL_TEST_DURATION_SEC")
@@ -108,20 +108,29 @@ def load_test(conn,
               block_writer):
     # generate random accounts
     log("generating accounts")
-    accounts = [create_account() for _ in range(num_of_accounts)]
+    account_creator = AccountCreator()
+    accounts = [account_creator.next() for _ in range(num_of_accounts)]
 
     # dump accounts
     log("dumping accounts to csv")
     account_writer.append_all([account.private_key, account.address] for account in accounts)
 
     # pre-compute (from,to) tx pairs
-    pre_txs = [(random.choice(accounts), random.choice(accounts))
-               for _ in range(total_duration * tx_per_sec)]
-    log(f"pre-computed {len(pre_txs)} transactions")
+    total_tx = total_duration * tx_per_sec
+    if num_of_accounts==tx_per_sec*total_duration:
+        log(f"generating one tx per account ({total_tx})")
+        frms = accounts[:]
+        pre_txs = [(frms.pop(), random.choice(accounts)) for _ in range(total_tx)]
+    else:
+        log(f"pre-computing {total_tx} transactions")
+        pre_txs = [(random.choice(accounts), random.choice(accounts)) for _ in range(total_tx)]
+
 
     # pre-fund accounts
     current_gas_price = get_gas_price(gas_price_level)
     fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier, pre_txs)
+
+    input("about to start load. press enter to continue...")
 
     log("starting gas monitoring")
     shared_gas_price = Value('d', current_gas_price)

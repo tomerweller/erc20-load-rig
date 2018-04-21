@@ -9,10 +9,11 @@ from collections import namedtuple
 from datetime import datetime
 
 import requests
+from eth_hash.auto import keccak
 from web3 import Web3, Account, HTTPProvider, IPCProvider
 from web3.utils.threads import Timeout
 
-from eth_utils.conversions import to_hex
+from eth_utils.conversions import to_hex, text_if_str, to_bytes
 from eth_utils import from_wei, to_wei
 
 
@@ -154,8 +155,15 @@ class AccountWrapper:
         return self._nonce - 1
 
 
-def create_account():
-    return AccountWrapper(Account.create().privateKey, 0)
+class AccountCreator:
+    def __init__(self):
+        self.seed = os.urandom(32)
+        self.count = 0
+
+    def next(self):
+        self.count += 1
+        extra_key_bytes = text_if_str(to_bytes, str(self.count))
+        return AccountWrapper(keccak(self.seed + extra_key_bytes), 0)
 
 
 class Connection:
