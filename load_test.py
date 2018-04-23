@@ -1,10 +1,10 @@
 import random
 import time
 from multiprocessing import Process, Value
-from block_monitor import monitor_block_timestamps
+from block_monitor import monitor_block_timestamps, BlockRow
 
 from common import now_str, get_gas_price, log, CSVWriter, env, env_int, wei_to_ether, get_env_connection, \
-    get_env_funder, AccountCreator
+    get_env_funder, AccountCreator, AccountResult
 
 THRESHOLD = env("THRESHOLD")
 TOTAL_TEST_DURATION_SEC = env_int("TOTAL_TEST_DURATION_SEC")
@@ -113,18 +113,17 @@ def load_test(conn,
 
     # dump accounts
     log("dumping accounts to csv")
-    account_writer.append_all([account.private_key, account.address] for account in accounts)
+    account_writer.append_all(account.to_account_result() for account in accounts)
 
     # pre-compute (from,to) tx pairs
     total_tx = total_duration * tx_per_sec
-    if num_of_accounts==tx_per_sec*total_duration:
+    if num_of_accounts == tx_per_sec * total_duration:
         log(f"generating one tx per account ({total_tx})")
         frms = accounts[:]
         pre_txs = [(frms.pop(), random.choice(accounts)) for _ in range(total_tx)]
     else:
         log(f"pre-computing {total_tx} transactions")
         pre_txs = [(random.choice(accounts), random.choice(accounts)) for _ in range(total_tx)]
-
 
     # pre-fund accounts
     current_gas_price = get_gas_price(gas_price_level)
@@ -164,17 +163,8 @@ def load_test(conn,
 if __name__ == "__main__":
     now = now_str()
     tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "to", "tx_hash", "timestamp", "gas_price"])
-    block_writer = CSVWriter(
-        f"results/blocks.{now}.csv", ["block_number",
-                                      "block_timestamp",
-                                      "my_timestamp",
-                                      "timestamp_delta",
-                                      "tx_count",
-                                      "avg_gas_price",
-                                      "median_gas_price",
-                                      "q5_gas_price",
-                                      "q95_gas_price"])
-    account_writer = CSVWriter(f"results/accounts.{now}.csv", ["private_key", "address"])
+    block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockRow._fields)
+    account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
     env_funder = get_env_funder(env_connection)
     load_test(env_connection,

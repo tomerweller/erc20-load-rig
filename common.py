@@ -135,6 +135,9 @@ def weighted_quantile(values, quantiles, sample_weight):
     return np.interp(quantiles, weighted_quantiles, values)
 
 
+AccountResult = namedtuple("AccountResult", "private_key address")
+
+
 class AccountWrapper:
     """Wrap around account and nonce. nonce is tracked in memory after initialization."""
 
@@ -153,6 +156,9 @@ class AccountWrapper:
     def get_use_nonce(self):
         self._nonce += 1
         return self._nonce - 1
+
+    def to_account_result(self):
+        return AccountResult(private_key=self.private_key, address=self.address)
 
 
 class AccountCreator:
