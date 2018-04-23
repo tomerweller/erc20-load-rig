@@ -5,8 +5,8 @@ from common import CSVWriter, log, now_str, get_env_connection
 
 INTERVAL = 0.1
 
-BlockRow = namedtuple('BlockRow', 'block_number, block_timestamp, my_timestamp, timestamp_delta tx_count '
-                                  'avg_gas_price median_gas_price q5_gas_price q95_gas_price')
+BlockResult = namedtuple('BlockResult', 'block_number, block_timestamp, my_timestamp, timestamp_delta tx_count '
+                                        'avg_gas_price median_gas_price q5_gas_price q95_gas_price')
 
 
 def monitor_block_timestamps(csv_out, interval):
@@ -22,7 +22,7 @@ def monitor_block_timestamps(csv_out, interval):
         my_timestamp = int(time.time())
         block_stats = conn.get_block_stats(latest_block)
 
-        row = BlockRow(
+        row = BlockResult(
             block_number=latest_block.number,
             block_timestamp=latest_block_timestamp,
             my_timestamp=my_timestamp,
@@ -38,5 +38,5 @@ def monitor_block_timestamps(csv_out, interval):
 
 
 if __name__ == "__main__":
-    block_csv_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockRow._fields)
+    block_csv_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
     monitor_block_timestamps(block_csv_writer, INTERVAL)

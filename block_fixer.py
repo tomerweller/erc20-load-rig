@@ -1,11 +1,11 @@
-from block_monitor import BlockRow
+from block_monitor import BlockResult
 from common import get_arg, CSVWriter, get_env_connection, log, csv_reader
 
 
 def block_fixer(block_csv_path, writer):
     """re-fetch stats and fill-in missing blocks"""
     conn = get_env_connection()
-    block_results = csv_reader(block_csv_path, BlockRow)
+    block_results = csv_reader(block_csv_path, BlockResult)
     block_results_mem = {block_result.block_number: block_result for block_result in block_results}
     new_results = []
     latest = None
@@ -16,7 +16,7 @@ def block_fixer(block_csv_path, writer):
         my_timestamp = latest.my_timestamp
         block = conn.get_block(i)
         block_stats = conn.get_block_stats(block)
-        row = BlockRow(
+        row = BlockResult(
             block_number=block.number,
             block_timestamp=block.timestamp,
             my_timestamp=my_timestamp,
@@ -32,4 +32,4 @@ def block_fixer(block_csv_path, writer):
 
 
 if __name__ == "__main__":
-    block_fixer(get_arg(), CSVWriter(f"{get_arg()}.fixed", BlockRow._fields))
+    block_fixer(get_arg(), CSVWriter(f"{get_arg()}.fixed", BlockResult._fields))

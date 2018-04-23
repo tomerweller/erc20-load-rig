@@ -1,7 +1,7 @@
 import random
 import time
 from multiprocessing import Process, Value
-from block_monitor import monitor_block_timestamps, BlockRow
+from block_monitor import monitor_block_timestamps, BlockResult
 
 from common import now_str, get_gas_price, log, CSVWriter, env, env_int, wei_to_ether, get_env_connection, \
     get_env_funder, AccountCreator, AccountResult
@@ -163,7 +163,7 @@ def load_test(conn,
 if __name__ == "__main__":
     now = now_str()
     tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "to", "tx_hash", "timestamp", "gas_price"])
-    block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockRow._fields)
+    block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
     account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
     env_funder = get_env_funder(env_connection)
