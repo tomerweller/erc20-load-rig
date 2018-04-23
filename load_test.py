@@ -1,5 +1,6 @@
 import random
 import time
+from collections import namedtuple
 from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps, BlockResult
 
@@ -87,10 +88,12 @@ def do_load(conn, txs, tx_per_sec, shared_gas_price, tx_writer):
         frm, to = tx
         gas_price = shared_gas_price.value
         tx_hash = conn.send_tokens(frm, frm.get_use_nonce(), to.address, 1, int(gas_price), TOKEN_TRANSFER_GAS_LIMIT)
-        row = [frm.address, to.address, tx_hash, str(tx_time), str(gas_price)]
-        log(row)
-        results.append(row)
-        tx_writer.append(row)
+        tx_result = TxResult(frm=frm.address, to=to.address, tx_hash=tx_hash, timestamp=str(tx_time),
+                             gas_price=str(gas_price), block_at_submit=conn.get_latest_block().number)
+
+        log(tx_result)
+        results.append(tx_result)
+        tx_writer.append(tx_result)
 
     log(f"total load duration {time.time()-start_time}")
     return results
@@ -147,7 +150,7 @@ def load_test(conn,
     gas_process.terminate()
 
     for i, tx_result in enumerate(tx_results):
-        tx_hash = tx_result[2]
+        tx_hash = tx_result.tx_hash
         log(f"waiting for transaction {tx_hash} ({i}/{len(tx_results)}) to complete")
         conn.wait_for_tx(tx_hash)
 
@@ -160,13 +163,16 @@ def load_test(conn,
     block_process.terminate()
 
 
+TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit")
+
 if __name__ == "__main__":
     now = now_str()
-    tx_writer = CSVWriter(f"results/txs.{now}.csv", ["from", "to", "tx_hash", "timestamp", "gas_price"])
+    tx_writer = CSVWriter(f"results/txs.{now}.csv", TxResult._fields)
     block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
     account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
     env_funder = get_env_funder(env_connection)
+
     load_test(env_connection,
               env_funder,
               TOTAL_TEST_ACCOUNTS,
