@@ -9,7 +9,7 @@ BlockResult = namedtuple('BlockResult', 'block_number, block_timestamp, my_times
                                         'avg_gas_price median_gas_price q5_gas_price q95_gas_price')
 
 
-def monitor_block_timestamps(csv_out, interval):
+def monitor_block_timestamps(csv_out, interval, shared_latest_block):
     """gather block information to csv.
     per block: block_number, block_timestamp (by miner), block_timestamp (by me), delta of both, tx_count
     """
@@ -18,6 +18,7 @@ def monitor_block_timestamps(csv_out, interval):
     latest_block = conn.get_latest_block()
     while True:
         log(f"new block detected: {latest_block.number}")
+        shared_latest_block.value = float(latest_block.number)
         latest_block_timestamp = latest_block.timestamp
         my_timestamp = int(time.time())
         block_stats = conn.get_block_stats(latest_block)

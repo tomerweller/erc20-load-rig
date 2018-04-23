@@ -19,15 +19,15 @@ ETHER_TRANSFER_GAS_LIMIT = env_int("ETHER_TRANSFER_GAS_LIMIT")
 INITIAL_TOKEN_TRANSFER_GAS_LIMIT = env_int("INITIAL_TOKEN_TRANSFER_GAS_LIMIT")
 
 
-def fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier, pre_txs):
+def fund_accounts(conn, funder, accounts, shared_gas_price, prefund_multiplier, pre_txs):
     # compute tx_count per account
     tx_count_per_acount = {account.private_key: 0 for account in accounts}
     for pre_tx in pre_txs:
         tx_count_per_acount[pre_tx[0].private_key] += 1
 
-    ether_per_tx = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier
-    expected = (len(accounts) * current_gas_price * ETHER_TRANSFER_GAS_LIMIT) + \
-               (len(accounts) * current_gas_price * INITIAL_TOKEN_TRANSFER_GAS_LIMIT) + \
+    ether_per_tx = TOKEN_TRANSFER_GAS_LIMIT * shared_gas_price * prefund_multiplier
+    expected = (len(accounts) * shared_gas_price * ETHER_TRANSFER_GAS_LIMIT) + \
+               (len(accounts) * shared_gas_price * INITIAL_TOKEN_TRANSFER_GAS_LIMIT) + \
                ether_per_tx * len(pre_txs)
     log(f"funding {len(accounts)} accounts with a total of ~{wei_to_ether(expected)} ether")
     input("press enter to continue...")
@@ -37,12 +37,12 @@ def fund_accounts(conn, funder, accounts, current_gas_price, prefund_multiplier,
     funding_txs = []
     for i, account in enumerate(accounts):
         to_address = account.address
-        total_ether = TOKEN_TRANSFER_GAS_LIMIT * current_gas_price * prefund_multiplier * tx_count_per_acount[
+        total_ether = TOKEN_TRANSFER_GAS_LIMIT * shared_gas_price * prefund_multiplier * tx_count_per_acount[
             account.private_key]
         fund_ether_tx_hash = conn.send_ether(funder, funder.get_use_nonce(), to_address, total_ether,
-                                             current_gas_price, ETHER_TRANSFER_GAS_LIMIT)
+                                             shared_gas_price, ETHER_TRANSFER_GAS_LIMIT)
         fund_tokens_tx_hash = conn.send_tokens(funder, funder.get_use_nonce(), to_address,
-                                               tx_count_per_acount[account.private_key], current_gas_price,
+                                               tx_count_per_acount[account.private_key], shared_gas_price,
                                                INITIAL_TOKEN_TRANSFER_GAS_LIMIT)
         funding_txs.append(fund_ether_tx_hash)
         funding_txs.append(fund_tokens_tx_hash)
@@ -74,7 +74,7 @@ def monitor_gas_price(threshold, gas_price, interval):
         time.sleep(interval)
 
 
-def do_load(conn, txs, tx_per_sec, shared_gas_price, tx_writer):
+def do_load(conn, txs, tx_per_sec, shared_gas_price, shared_latest_block, tx_writer):
     start_time = time.time()
     interval = 1 / tx_per_sec
     results = []
@@ -89,7 +89,7 @@ def do_load(conn, txs, tx_per_sec, shared_gas_price, tx_writer):
         gas_price = shared_gas_price.value
         tx_hash = conn.send_tokens(frm, frm.get_use_nonce(), to.address, 1, int(gas_price), TOKEN_TRANSFER_GAS_LIMIT)
         tx_result = TxResult(frm=frm.address, to=to.address, tx_hash=tx_hash, timestamp=str(tx_time),
-                             gas_price=str(gas_price), block_at_submit=conn.get_latest_block().number)
+                             gas_price=str(gas_price), block_at_submit=shared_latest_block.value)
 
         log(tx_result)
         results.append(tx_result)
@@ -139,12 +139,13 @@ def load_test(conn,
     gas_process = Process(target=monitor_gas_price, args=(gas_price_level, shared_gas_price, GAS_UPDATE_INTERVAL))
     gas_process.start()
 
+    shared_latest_block = Value('d', float(conn.get_latest_block().number))
     log("starting block monitoring")
-    block_process = Process(target=monitor_block_timestamps, args=(block_writer, BLOCK_UPDATE_INTERVAL))
+    block_process = Process(target=monitor_block_timestamps, args=(block_writer, BLOCK_UPDATE_INTERVAL, shared_latest_block))
     block_process.start()
 
     log("executing txs")
-    tx_results = do_load(conn, pre_txs, tx_per_sec, shared_gas_price, tx_writer)
+    tx_results = do_load(conn, pre_txs, tx_per_sec, shared_gas_price, shared_latest_block, tx_writer)
 
     log(f"killing gas monitor")
     gas_process.terminate()
