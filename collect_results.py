@@ -2,8 +2,7 @@ from collections import namedtuple
 
 from block_monitor import BlockResult
 from common import get_arg, now_str, get_env_connection, CSVWriter, csv_reader, log
-# from load_test import TxResult
-TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit") #TODO: FIXXXX
+from load_test import TxResult
 
 NUM_OF_BLOCKS = 12
 

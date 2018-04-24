@@ -271,9 +271,14 @@ class Connection:
                           q95_gas_price=q95_gas_price)
 
 
-def get_gas_price(threshold):
+def get_gas_prices(tiers):
     r = requests.get('https://ethgasstation.info/json/ethgasAPI.json')
-    return int(r.json()[threshold] * math.pow(10, 8))
+    d = r.json()
+    return {tier: int(d[tier] * math.pow(10, 8)) for tier in tiers}
+
+
+def get_gas_price(tier):
+    return get_gas_prices([tier])[tier]
 
 
 def get_gas_price_low():
