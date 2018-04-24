@@ -1,14 +1,18 @@
-from common import get_arg, now_str, get_env_connection
+from collections import namedtuple
+
+from block_monitor import BlockResult
+from common import get_arg, now_str, get_env_connection, CSVWriter, csv_reader, log
+# from load_test import TxResult
+TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit") #TODO: FIXXXX
 
 NUM_OF_BLOCKS = 12
 
 
 class BlockCache:
-    def __init__(self, conn, blocks_csv):
+    def __init__(self, conn, block_results):
         self.conn = conn
-        with open(blocks_csv) as f:
-            blocks = [line.split(',') for line in f.read().splitlines()[1:]]
-        self.block_mem = {block[0]: (block[1], block[2]) for block in blocks}
+        self.block_mem = {block_result.block_number: (block_result.block_timestamp, block_result.my_timestamp)
+                          for block_result in block_results}
 
     def get(self, block_number):
         k = str(block_number)
@@ -18,36 +22,31 @@ class BlockCache:
         return self.block_mem[k]
 
 
-def collect_stats(tx_csv, blocks_csv, tx_plus_csv):
+def collect_stats(tx_results, block_results, tx_plus_writer):
     conn = get_env_connection()
-    block_cache = BlockCache(conn, blocks_csv)
-    with open(tx_csv) as f:
-        lines = f.read().splitlines()[1:]
+    block_cache = BlockCache(conn, block_results)
 
-    header_row = ['from', 'to', 'tx_hash', 'submitted_at', 'gas_price', 'gas_used', 'block_number']
-
-    for i in range(1, 1 + NUM_OF_BLOCKS):
-        header_row.append(f'timestamp_{i}')
-        header_row.append(f'self_timestamp_{i}')
-
-    with open(tx_plus_csv, "w") as f:
-        f.write(','.join(header_row) + "\n")
-
-    for line in lines:
-        data = line.split(',')
-        tx_hash = data[2]
+    for tx_result in tx_results:
+        result = []
+        result.extend(tx_result)
+        tx_hash = tx_result.tx_hash
         tx = conn.get_transaction_receipt(tx_hash)
         if tx and tx.blockNumber:
-            data.append(str(tx.gasUsed))
-            data.append(str(tx.blockNumber))
+            result.append(str(tx.gasUsed))
+            result.append(str(tx.blockNumber))
             for block_number in range(tx.blockNumber, tx.blockNumber + NUM_OF_BLOCKS):
-                data.extend(block_cache.get(block_number))
-
-        newline = ", ".join(data)
-        print(newline)
-        with open(tx_plus_csv, "a+") as csv_file:
-            csv_file.write(newline + "\n")
+                result.extend(block_cache.get(block_number))
+        tx_plus = TxPlusResult(*result)
+        log(tx_plus)
+        tx_plus_writer.append(tx_plus)
 
 
 if __name__ == "__main__":
-    collect_stats(get_arg(0), get_arg(1), f"results/txs.plus.{now_str()}.csv")
+    tx_plus_fields = []
+    tx_plus_fields.extend(TxResult._fields)
+    tx_plus_fields.extend(['gas_used', 'block_number'])
+    for i in range(1, 1 + NUM_OF_BLOCKS):
+        tx_plus_fields.extend([f'timestamp_{i}', f'self_timestamp_{i}'])
+    TxPlusResult = namedtuple("TxPlusResult", " ".join(tx_plus_fields))
+    collect_stats(csv_reader(get_arg(0), TxResult), csv_reader(get_arg(1), BlockResult),
+                  CSVWriter(f"results/txs.plus.{now_str()}.csv", TxPlusResult._fields))
