@@ -18,6 +18,5 @@ if __name__ == "__main__":
         tx_result = TxResult(frm=old_tx.frm, to=old_tx.to, tx_hash=old_tx.tx_hash, timestamp=old_tx.timestamp,
                              gas_price=old_tx.gas_price, block_at_submit=block_results[block_index].block_number)
         tx_results.append(tx_result)
-    new_file_path = f"{get_arg(0)}.fixed"
-    log(new_file_path)
-    CSVWriter(new_file_path, TxResult._fields).append_all(tx_results)
+    log(f"writing to {get_arg(2)}")
+    CSVWriter(get_arg(2), TxResult._fields).append_all(tx_results)

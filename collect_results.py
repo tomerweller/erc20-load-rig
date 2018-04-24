@@ -48,4 +48,4 @@ if __name__ == "__main__":
         tx_plus_fields.extend([f'timestamp_{i}', f'self_timestamp_{i}'])
     TxPlusResult = namedtuple("TxPlusResult", " ".join(tx_plus_fields))
     collect_stats(csv_reader(get_arg(0), TxResult), csv_reader(get_arg(1), BlockResult),
-                  CSVWriter(f"results/txs.plus.{now_str()}.csv", TxPlusResult._fields))
+                  CSVWriter(get_arg(2), TxPlusResult._fields))
