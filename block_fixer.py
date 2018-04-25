@@ -1,11 +1,15 @@
+from collections import namedtuple
+
 from block_monitor import BlockResult
 from common import get_arg, CSVWriter, get_env_connection, log, csv_reader
+
+OldBlockResult = namedtuple('BlockResult', 'block_number, block_timestamp, my_timestamp, timestamp_delta')
 
 
 def block_fixer(block_csv_path, writer):
     """re-fetch stats and fill-in missing blocks"""
     conn = get_env_connection()
-    block_results = csv_reader(block_csv_path, BlockResult)
+    block_results = csv_reader(block_csv_path, OldBlockResult)
     block_results_mem = {block_result.block_number: block_result for block_result in block_results}
     new_results = []
     latest = None
