@@ -9,7 +9,7 @@ from common import now_str, get_gas_price, log, CSVWriter, env, env_int, env_flo
 
 LoadConfig = namedtuple("LoadConfig",
                         "test_duration account_count tx_per_sec gas_tier funding_gas_tier funding_tx_per_sec "
-                        "prefund_multiplier gas_update_interval block_update_interval initial_"
+                        "funding_max_gas_price prefund_multiplier gas_update_interval block_update_interval initial_"
                         "token_transfer_gas_limit ether_transfer_gas_limit token_transfer_gas_limit")
 
 
@@ -31,7 +31,7 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
 
     funding_txs = []
     for i, account in enumerate(accounts):
-        funding_gas_price = gas_price_dict[config.funding_gas_tier]
+        funding_gas_price = min(gas_price_dict[config.funding_gas_tier], config.funding_max_gas_price)
         to_address = account.address
         total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
                       tx_count_per_acount[
@@ -171,6 +171,7 @@ if __name__ == "__main__":
                         gas_tier=env("THRESHOLD"),
                         funding_gas_tier=env("FUND_THRESHOLD"),
                         funding_tx_per_sec=env_int("FUNDING_TX_PER_SEC"),
+                        funding_max_gas_price=env_int("FUNDING_MAX_GAS_PRICE"),
                         prefund_multiplier=env_float("PREFUND_MULTIPLIER"),
                         gas_update_interval=env_int("GAS_UPDATE_INTERVAL"),
                         block_update_interval=env_int("BLOCK_UPDATE_INTERVAL"),
