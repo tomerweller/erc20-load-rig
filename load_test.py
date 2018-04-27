@@ -21,8 +21,8 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
 
     load_gas_price = gas_price_dict[config.gas_tier]
     ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
-    expected = (len(accounts) * load_gas_price * config.ether_transfer_gas_limit) + \
-               (len(accounts) * load_gas_price * config.initial_token_transfer_gas_limit) + ether_per_tx * len(
+    expected = (len(accounts) * config.funding_max_gas_price * config.ether_transfer_gas_limit) + \
+               (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + ether_per_tx * len(
         pre_txs)
     log(f"funding {len(accounts)} accounts with a total of ~{wei_to_ether(expected)} ether")
     input("press enter to continue...")
