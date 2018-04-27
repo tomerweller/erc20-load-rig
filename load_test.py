@@ -4,7 +4,7 @@ from collections import namedtuple
 from multiprocessing import Process, Value, Manager
 from block_monitor import monitor_block_timestamps, BlockResult
 
-from common import now_str, get_gas_price, log, CSVWriter, env, env_int, wei_to_ether, get_env_connection, \
+from common import now_str, get_gas_price, log, CSVWriter, env, env_int, env_float, wei_to_ether, get_env_connection, \
     get_env_funder, AccountCreator, AccountResult, get_gas_prices
 
 LoadConfig = namedtuple("LoadConfig",
@@ -171,7 +171,7 @@ if __name__ == "__main__":
                         gas_tier=env("THRESHOLD"),
                         funding_gas_tier=env("FUND_THRESHOLD"),
                         funding_tx_per_sec=env_int("FUNDING_TX_PER_SEC"),
-                        prefund_multiplier=env_int("PREFUND_MULTIPLIER"),
+                        prefund_multiplier=env_float("PREFUND_MULTIPLIER"),
                         gas_update_interval=env_int("GAS_UPDATE_INTERVAL"),
                         block_update_interval=env_int("BLOCK_UPDATE_INTERVAL"),
                         initial_token_transfer_gas_limit=env_int("INITIAL_TOKEN_TRANSFER_GAS_LIMIT"),

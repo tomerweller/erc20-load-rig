@@ -31,6 +31,10 @@ def env_int(k, default=None):
     return int(env(k, default))
 
 
+def env_float(k, default=None):
+    return float(env(k, default))
+
+
 def now_str():
     return datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
 
@@ -214,11 +218,11 @@ class Connection:
         try:
             return self.sign_send_tx(from_account, tx)
         except ValueError as e:
-            balance = self.get_balance(from_account.address)
-            if balance > 0:
-                new_gas_price = balance / gas_limit
-                if new_gas_price < gas_price:
-                    log(f"trying lower gas price {new_gas_price} ({e})")
+            new_gas_price = self.get_balance(from_account.address) / gas_limit
+            if 0 < new_gas_price < gas_price:
+                log(f"failed. trying lower gas price {new_gas_price} ({e})")
+                tx["gasPrice"] = new_gas_price
+                return self.sign_send_tx(from_account, tx)
             raise e
 
     def wait_for_tx(self, tx_hash):
