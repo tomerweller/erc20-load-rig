@@ -36,11 +36,10 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
         total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
                       tx_count_per_acount[
                           account.private_key]
-        fund_ether_tx_hash = conn.send_ether(funder, funder.get_use_nonce(), to_address, total_ether,
-                                             funding_gas_price, config.ether_transfer_gas_limit)
-        fund_tokens_tx_hash = conn.send_tokens(funder, funder.get_use_nonce(), to_address,
-                                               tx_count_per_acount[account.private_key], funding_gas_price,
-                                               config.initial_token_transfer_gas_limit)
+        fund_ether_tx_hash = conn.send_ether(funder, to_address, total_ether, funding_gas_price,
+                                             config.ether_transfer_gas_limit)
+        fund_tokens_tx_hash = conn.send_tokens(funder, to_address, tx_count_per_acount[account.private_key],
+                                               funding_gas_price, config.initial_token_transfer_gas_limit)
         funding_txs.append(fund_ether_tx_hash)
         funding_txs.append(fund_tokens_tx_hash)
         log(f"funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash} ({i}/{len(accounts)})")
@@ -85,7 +84,7 @@ def do_load(conn, config, txs, gas_price_dict, shared_latest_block, tx_writer):
         tx_time = int(time.time())
         frm, to = tx
         gas_price = gas_price_dict[config.gas_tier]
-        tx_hash = conn.send_tokens(frm, frm.get_use_nonce(), to.address, 1, int(gas_price),
+        tx_hash = conn.send_tokens(frm, to.address, 1, int(gas_price),
                                    config.token_transfer_gas_limit)
         tx_result = TxResult(frm=frm.address, to=to.address, tx_hash=tx_hash, timestamp=str(tx_time),
                              gas_price=str(gas_price), block_at_submit=shared_latest_block.value)

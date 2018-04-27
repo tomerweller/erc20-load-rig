@@ -143,7 +143,7 @@ class AccountWrapper:
 
     def __init__(self, private_key, nonce):
         self.w3account, = Account.privateKeyToAccount(private_key),
-        self._nonce = nonce
+        self.nonce = nonce
 
     @property
     def address(self):
@@ -154,8 +154,8 @@ class AccountWrapper:
         return to_hex(self.w3account.privateKey)
 
     def get_use_nonce(self):
-        self._nonce += 1
-        return self._nonce - 1
+        self.nonce += 1
+        return self.nonce - 1
 
     def to_account_result(self):
         return AccountResult(private_key=self.private_key, address=self.address)
@@ -184,33 +184,42 @@ class Connection:
         return AccountWrapper(private_key, self.get_transaction_count(w3acc.address))
 
     def sign_send_tx(self, from_account, tx_dict):
+        tx_dict["nonce"] = from_account.nonce
         signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.private_key)
         try:
-            return to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+            tx_hash = to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+            from_account.nonce += 1
+            return tx_hash
         except Timeout as e:
             log(f"ipc timeout ({e}). ignoring.")
             return to_hex(signed_tx.hash)
 
-    def send_ether(self, from_account, nonce, to_address, val, gas_price, gas_limit):
+    def send_ether(self, from_account, to_address, val, gas_price, gas_limit):
         tx = {
             "to": to_address,
             "gas": gas_limit,
             "gasPrice": gas_price,
             "value": val,
             "chainId": self.chain_id,
-            "nonce": nonce
         }
         return self.sign_send_tx(from_account, tx)
 
-    def send_tokens(self, from_account, nonce, to_address, val, gas_price, gas_limit):
+    def send_tokens(self, from_account, to_address, val, gas_price, gas_limit):
         tx = {
             "gas": gas_limit,
             "gasPrice": gas_price,
             "chainId": self.chain_id,
-            "nonce": nonce
         }
         tx = self.contract.functions.transfer(to_address, val).buildTransaction(tx)
-        return self.sign_send_tx(from_account, tx)
+        try:
+            return self.sign_send_tx(from_account, tx)
+        except ValueError as e:
+            balance = self.get_balance(from_account.address)
+            if balance > 0:
+                new_gas_price = balance / gas_limit
+                if new_gas_price < gas_price:
+                    log(f"trying lower gas price {new_gas_price} ({e})")
+            raise e
 
     def wait_for_tx(self, tx_hash):
         while True:
