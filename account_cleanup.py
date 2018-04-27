@@ -1,6 +1,6 @@
 import time
 
-from common import get_gas_price_low, get_arg, log, AccountWrapper, get_env_connection, get_env_funder
+from common import get_gas_price_low, get_arg, log, get_env_connection, get_env_funder, AccountResult, csv_reader
 
 INTERVAL = 1
 
@@ -11,16 +11,14 @@ def cleanup(csv_in):
     conn = get_env_connection()
     funder = get_env_funder(conn)
 
-    with open(csv_in) as f:
-        lines = f.readlines()
-
     gas_price = get_gas_price_low()
     gas_limit = 21000
 
     log(f"using gas price: {gas_price}, gas limit: {gas_limit}")
-    accounts = [conn.get_account(line.split(',')[0]) for line in lines[1:]]
+    account_results = csv_reader(csv_in, AccountResult._fields)
 
-    for i, account in enumerate(accounts):
+    for i, account_result in enumerate(account_results):
+        account = conn.get_account(account_result.private_key)
         log(f"cleaning up {account.address} ({i}/{len(accounts)})")
         balance = conn.get_balance(account.address)
         if balance >= gas_limit * gas_price:
