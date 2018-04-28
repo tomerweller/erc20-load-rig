@@ -22,8 +22,8 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
     load_gas_price = gas_price_dict[config.gas_tier]
     ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
     expected = (len(accounts) * config.funding_max_gas_price * config.ether_transfer_gas_limit) + \
-               (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + ether_per_tx * len(
-        pre_txs)
+               (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + \
+               ether_per_tx * len(pre_txs)
     log(f"funding {len(accounts)} accounts with a total of ~{wei_to_ether(expected)} ether")
     input("press enter to continue...")
     start_balance = conn.get_balance(funder.address)
@@ -60,7 +60,10 @@ def monitor_gas_price(tiers, gas_price_dict, interval):
     while True:
         try:
             new_price_dict = get_gas_prices(tiers)
-            if new_price_dict != dict(gas_price_dict):
+            dicts_equal = True
+            for tier in tiers:
+                dicts_equal = dicts_equal and new_price_dict[tier] == gas_price_dict[tier]
+            if not dicts_equal:
                 log(f"gas price change: {gas_price_dict} -> {new_price_dict}")
                 for tier in tiers:
                     gas_price_dict[tier] = new_price_dict[tier]
