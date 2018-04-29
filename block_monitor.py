@@ -1,5 +1,6 @@
 import time
 from collections import namedtuple
+from multiprocessing import Value
 
 from common import CSVWriter, log, now_str, get_env_connection
 
@@ -39,5 +40,6 @@ def monitor_block_timestamps(csv_out, interval, shared_latest_block):
 
 
 if __name__ == "__main__":
+    shared_latest_block = Value('d', 0.0)
     block_csv_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
-    monitor_block_timestamps(block_csv_writer, INTERVAL)
+    monitor_block_timestamps(block_csv_writer, INTERVAL, shared_latest_block)
