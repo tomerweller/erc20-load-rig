@@ -1,11 +1,11 @@
 import random
 import time
 from collections import namedtuple
-from multiprocessing import Process, Value, Manager
+from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps, BlockResult
 
 from common import now_str, get_gas_price, log, CSVWriter, env, env_int, env_float, wei_to_ether, get_env_connection, \
-    get_env_funder, AccountCreator, AccountResult, get_gas_prices
+    get_env_funder, AccountCreator, AccountResult
 
 LoadConfig = namedtuple("LoadConfig",
                         "test_duration account_count tx_per_sec gas_tier funding_gas_tier funding_tx_per_sec "
@@ -13,13 +13,12 @@ LoadConfig = namedtuple("LoadConfig",
                         "token_transfer_gas_limit ether_transfer_gas_limit token_transfer_gas_limit")
 
 
-def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
-    # compute tx_count per account
+def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
     tx_count_per_acount = {account.private_key: 0 for account in accounts}
     for pre_tx in pre_txs:
         tx_count_per_acount[pre_tx[0].private_key] += 1
 
-    load_gas_price = gas_price_dict[config.gas_tier]
+    load_gas_price = shard_gas_price.value
     ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
     expected = (len(accounts) * config.funding_max_gas_price * config.ether_transfer_gas_limit) + \
                (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + \
@@ -31,7 +30,7 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
 
     funding_txs = []
     for i, account in enumerate(accounts):
-        funding_gas_price = min(gas_price_dict[config.funding_gas_tier], config.funding_max_gas_price)
+        funding_gas_price = min(shard_gas_price.value, config.funding_max_gas_price)
         to_address = account.address
         total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
                       tx_count_per_acount[
@@ -55,26 +54,22 @@ def fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs):
     log(f"delta from estimate (wei): {expected-(start_balance-final_balance)}")
 
 
-def monitor_gas_price(tiers, gas_price_dict, interval):
+def monitor_gas_price(gas_tier, shared_gas_price, interval):
     log("starting gas updates")
     while True:
         try:
-            new_price_dict = get_gas_prices(tiers)
-            dicts_equal = True
-            for tier in tiers:
-                dicts_equal = dicts_equal and new_price_dict[tier] == gas_price_dict[tier]
-            if not dicts_equal:
-                log(f"gas price change: {gas_price_dict} -> {new_price_dict}")
-                for tier in tiers:
-                    gas_price_dict[tier] = new_price_dict[tier]
+            new_gas_price = get_gas_price(gas_tier)
+            if shared_gas_price.value != new_gas_price:
+                log(f"gas price change: {shared_gas_price.value} -> {new_gas_price}")
+                shared_gas_price.value = new_gas_price
             else:
-                log(f"gas price unchanged: {gas_price_dict}")
-        except Exception as e:
+                log(f"gas price unchanged: {shared_gas_price.value}")
+        except ValueError as e:
             log(f"exception fetching gas price : {e}")
         time.sleep(interval)
 
 
-def do_load(conn, config, txs, gas_price_dict, shared_latest_block, tx_writer):
+def do_load(conn, config, txs, shared_gas_price, shared_latest_block, tx_writer):
     start_time = time.time()
     interval = 1 / config.tx_per_sec
     results = []
@@ -86,7 +81,7 @@ def do_load(conn, config, txs, gas_price_dict, shared_latest_block, tx_writer):
 
         tx_time = int(time.time())
         frm, to = tx
-        gas_price = gas_price_dict[config.gas_tier]
+        gas_price = shared_gas_price.value
         tx_hash = conn.send_tokens(frm, to.address, 1, int(gas_price),
                                    config.token_transfer_gas_limit)
         tx_result = TxResult(frm=frm.address, to=to.address, tx_hash=tx_hash, timestamp=str(tx_time),
@@ -122,27 +117,23 @@ def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
     # start monitoring gas
     log("starting gas monitoring")
 
-    with Manager() as manager:
-        gas_price_dict = manager.dict()
-        gas_price_dict[config.gas_tier] = get_gas_price(config.gas_tier)
-        gas_price_dict[config.funding_gas_tier] = get_gas_price(config.funding_gas_tier)
-        gas_process = Process(target=monitor_gas_price,
-                              args=([config.gas_tier, config.funding_gas_tier], gas_price_dict,
-                                    config.gas_update_interval))
-        gas_process.start()
-        fund_accounts(conn, funder, config, accounts, gas_price_dict, pre_txs)
+    shared_gas_price = Value('d', float(get_gas_price(config.gas_tier)))
+    gas_process = Process(target=monitor_gas_price,
+                          args=(config.gas_tier, shared_gas_price, config.gas_update_interval))
+    gas_process.start()
+    fund_accounts(conn, funder, config, accounts, shared_gas_price, pre_txs)
 
-        shared_latest_block = Value('d', float(conn.get_latest_block().number))
-        log("starting block monitoring")
-        block_process = Process(target=monitor_block_timestamps,
-                                args=(block_writer, config.block_update_interval, shared_latest_block))
-        block_process.start()
+    shared_latest_block = Value('d', float(conn.get_latest_block().number))
+    log("starting block monitoring")
+    block_process = Process(target=monitor_block_timestamps,
+                            args=(block_writer, config.block_update_interval, shared_latest_block))
+    block_process.start()
 
-        log("executing txs")
-        tx_results = do_load(conn, config, pre_txs, gas_price_dict, shared_latest_block, tx_writer)
+    log("executing txs")
+    tx_results = do_load(conn, config, pre_txs, shared_gas_price, shared_latest_block, tx_writer)
 
-        log(f"killing gas monitor")
-        gas_process.terminate()
+    log(f"killing gas monitor")
+    gas_process.terminate()
 
     for i, tx_result in enumerate(tx_results):
         tx_hash = tx_result.tx_hash
