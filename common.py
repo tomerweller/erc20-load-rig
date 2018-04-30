@@ -202,8 +202,8 @@ class Connection:
         tx = {
             "to": to_address,
             "gas": gas_limit,
-            "gasPrice": gas_price,
-            "value": val,
+            "gasPrice": int(gas_price),
+            "value": int(val),
             "chainId": self.chain_id,
         }
         return self.sign_send_tx(from_account, tx)
@@ -211,7 +211,7 @@ class Connection:
     def send_tokens(self, from_account, to_address, val, gas_price, gas_limit):
         tx = {
             "gas": gas_limit,
-            "gasPrice": gas_price,
+            "gasPrice": int(gas_price),
             "chainId": self.chain_id,
         }
         tx = self.contract.functions.transfer(to_address, val).buildTransaction(tx)
@@ -221,7 +221,7 @@ class Connection:
             new_gas_price = self.get_balance(from_account.address) / gas_limit
             if 0 < new_gas_price < gas_price:
                 log(f"failed. trying lower gas price {new_gas_price} ({e})")
-                tx["gasPrice"] = new_gas_price
+                tx["gasPrice"] = int(new_gas_price)
                 return self.sign_send_tx(from_account, tx)
             raise e
 
@@ -274,6 +274,8 @@ class Connection:
             return BlockStats(0, 0, 0, 0, 0)
         gas_prices = [wei_to_gwei(tx.gasPrice) for tx in txs]
         gas_usages = [tx.gas for tx in txs]
+        log(f"minimum gas is: {min(gas_prices)}")
+        log(f"maximum gas is: {max(gas_prices)}")
         avg_gas_price = sum([gas_price * gas_used for gas_price, gas_used in zip(gas_prices, gas_usages)]) / sum(
             gas_usages)
         median_gas_price, q5_gas_price, q95_gas_price = weighted_quantile(gas_prices, [0.5, 0.05, 0.95], gas_usages)
@@ -291,6 +293,7 @@ def get_gas_prices(tiers):
 
 
 def get_gas_price(tier):
+    log(f"returning gas price: {get_gas_prices([tier])[tier]}")
     return get_gas_prices([tier])[tier]
 
 
