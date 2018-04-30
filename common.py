@@ -191,11 +191,18 @@ class Connection:
         tx_dict["nonce"] = from_account.nonce
         signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.private_key)
         try:
-            tx_hash = to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+            try:
+                tx_hash = to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
+            except ValueError as e:
+                log(f"tx failed. trying with 0.2 more gwei({e})")
+                tx_dict["gasPrice"] += 200000000
+                signed_tx = self.w3.eth.account.signTransaction(tx_dict, from_account.private_key)
+                tx_hash = to_hex(self.w3.eth.sendRawTransaction(signed_tx.rawTransaction))
             from_account.nonce += 1
             return tx_hash
         except Timeout as e:
             log(f"ipc timeout ({e}). ignoring.")
+            from_account.nonce += 1
             return to_hex(signed_tx.hash)
 
     def send_ether(self, from_account, to_address, val, gas_price, gas_limit):
