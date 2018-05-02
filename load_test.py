@@ -151,7 +151,7 @@ if __name__ == "__main__":
     env_connection = get_env_connection()
     env_funder = get_env_funder(env_connection)
     env_config = get_env_config()
-    log(f"load configuration is {config}")
+    log(f"load configuration is {env_config}")
 
     load_test(env_connection,
               env_funder,
