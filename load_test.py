@@ -94,7 +94,7 @@ def do_load(conn, config, txs, shared_gas_price, shared_latest_block, tx_writer)
     return results
 
 
-def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
+def prepare_txs(config, account_writer, tx_plan_writer):
     # generate random accounts
     log("generating accounts")
     account_creator = AccountCreator()
@@ -109,10 +109,17 @@ def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
     if config.account_count == config.tx_per_sec * config.test_duration:
         log(f"generating one tx per account ({total_tx})")
         frms = accounts[:]
-        pre_txs = [(frms.pop(), random.choice(accounts)) for _ in range(total_tx)]
+        planned_txs = [(frms.pop(), random.choice(accounts)) for _ in range(total_tx)]
     else:
         log(f"pre-computing {total_tx} transactions")
-        pre_txs = [(random.choice(accounts), random.choice(accounts)) for _ in range(total_tx)]
+        planned_txs = [(random.choice(accounts), random.choice(accounts)) for _ in range(total_tx)]
+
+    tx_plan_writer.append_all(TxPlannedResult(tx[0].address, tx[1].address) for tx in planned_txs)
+    return accounts, planned_txs
+
+
+def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, block_writer):
+    accounts, planned_txs = prepare_txs(config, account_writer, tx_plan_writer)
 
     # start monitoring gas
     log("starting gas monitoring")
@@ -121,7 +128,9 @@ def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
     gas_process = Process(target=monitor_gas_price,
                           args=(config.gas_tier, shared_gas_price, config.gas_update_interval))
     gas_process.start()
-    fund_accounts(conn, funder, config, accounts, shared_gas_price, pre_txs)
+
+    # funding
+    fund_accounts(conn, funder, config, accounts, shared_gas_price, planned_txs)
 
     shared_latest_block = Value('d', float(conn.get_latest_block().number))
     log("starting block monitoring")
@@ -130,7 +139,7 @@ def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
     block_process.start()
 
     log("executing txs")
-    tx_results = do_load(conn, config, pre_txs, shared_gas_price, shared_latest_block, tx_writer)
+    tx_results = do_load(conn, config, planned_txs, shared_gas_price, shared_latest_block, tx_writer)
 
     log(f"killing gas monitor")
     gas_process.terminate()
@@ -149,11 +158,13 @@ def load_test(conn, funder, config, account_writer, tx_writer, block_writer):
     block_process.terminate()
 
 
+TxPlannedResult = namedtuple("TxPlannedResult", "frm to")
 TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit")
 
 if __name__ == "__main__":
     now = now_str()
     tx_writer = CSVWriter(f"results/txs.{now}.csv", TxResult._fields)
+    tx_plan_writer = CSVWriter(f"results/txs.planned.{now}.csv", TxPlannedResult._fields)
     block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
     account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
@@ -180,4 +191,5 @@ if __name__ == "__main__":
               config,
               account_writer,
               tx_writer,
+              tx_plan_writer,
               block_writer)
