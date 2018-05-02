@@ -305,6 +305,21 @@ def get_gas_price_low():
     return get_gas_price("safeLow")
 
 
+def monitor_gas_price(gas_tier, shared_gas_price, interval):
+    log("starting gas updates")
+    while True:
+        try:
+            new_gas_price = get_gas_price(gas_tier)
+            if shared_gas_price.value != new_gas_price:
+                log(f"gas price change: {shared_gas_price.value} -> {new_gas_price}")
+                shared_gas_price.value = new_gas_price
+            else:
+                log(f"gas price unchanged: {shared_gas_price.value}")
+        except ValueError as e:
+            log(f"exception fetching gas price : {e}")
+        time.sleep(interval)
+
+
 def get_env_connection():
     chain_id = env_int('CHAIN_ID')
     try:
@@ -319,3 +334,27 @@ def get_env_connection():
 
 def get_env_funder(conn):
     return conn.get_account(env('FUNDER_PK'))
+
+
+TxPlannedResult = namedtuple("TxPlannedResult", "frm to")
+
+LoadConfig = namedtuple("LoadConfig",
+                        "test_duration account_count tx_per_sec gas_tier funding_gas_tier funding_tx_per_sec "
+                        "funding_max_gas_price prefund_multiplier gas_update_interval block_update_interval initial_"
+                        "token_transfer_gas_limit ether_transfer_gas_limit token_transfer_gas_limit")
+
+
+def get_env_config():
+    return LoadConfig(test_duration=env_int("TOTAL_TEST_DURATION_SEC"),
+                      account_count=env_int("TOTAL_TEST_ACCOUNTS"),
+                      tx_per_sec=env_int("TX_PER_SEC"),
+                      gas_tier=env("THRESHOLD"),
+                      funding_gas_tier=env("FUND_THRESHOLD"),
+                      funding_tx_per_sec=env_int("FUNDING_TX_PER_SEC"),
+                      funding_max_gas_price=env_int("FUNDING_MAX_GAS_PRICE"),
+                      prefund_multiplier=env_float("PREFUND_MULTIPLIER"),
+                      gas_update_interval=env_int("GAS_UPDATE_INTERVAL"),
+                      block_update_interval=env_int("BLOCK_UPDATE_INTERVAL"),
+                      initial_token_transfer_gas_limit=env_int("INITIAL_TOKEN_TRANSFER_GAS_LIMIT"),
+                      ether_transfer_gas_limit=env_int("ETHER_TRANSFER_GAS_LIMIT"),
+                      token_transfer_gas_limit=env_int("TOKEN_TRANSFER_GAS_LIMIT"))

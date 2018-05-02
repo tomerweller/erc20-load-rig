@@ -4,13 +4,8 @@ from collections import namedtuple
 from multiprocessing import Process, Value
 from block_monitor import monitor_block_timestamps, BlockResult
 
-from common import now_str, get_gas_price, log, CSVWriter, env, env_int, env_float, wei_to_ether, get_env_connection, \
-    get_env_funder, AccountCreator, AccountResult
-
-LoadConfig = namedtuple("LoadConfig",
-                        "test_duration account_count tx_per_sec gas_tier funding_gas_tier funding_tx_per_sec "
-                        "funding_max_gas_price prefund_multiplier gas_update_interval block_update_interval initial_"
-                        "token_transfer_gas_limit ether_transfer_gas_limit token_transfer_gas_limit")
+from common import now_str, get_gas_price, log, CSVWriter, wei_to_ether, get_env_connection, get_env_funder, \
+    AccountCreator, AccountResult, monitor_gas_price, get_env_config, TxPlannedResult
 
 
 def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
@@ -52,21 +47,6 @@ def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
     log(f"new funder balance : {wei_to_ether(final_balance)}")
     log(f"total spent: {wei_to_ether(start_balance-final_balance)}")
     log(f"delta from estimate (wei): {expected-(start_balance-final_balance)}")
-
-
-def monitor_gas_price(gas_tier, shared_gas_price, interval):
-    log("starting gas updates")
-    while True:
-        try:
-            new_gas_price = get_gas_price(gas_tier)
-            if shared_gas_price.value != new_gas_price:
-                log(f"gas price change: {shared_gas_price.value} -> {new_gas_price}")
-                shared_gas_price.value = new_gas_price
-            else:
-                log(f"gas price unchanged: {shared_gas_price.value}")
-        except ValueError as e:
-            log(f"exception fetching gas price : {e}")
-        time.sleep(interval)
 
 
 def do_load(conn, config, accounts, txs, shared_gas_price, shared_latest_block, tx_writer):
@@ -160,7 +140,6 @@ def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, b
     block_process.terminate()
 
 
-TxPlannedResult = namedtuple("TxPlannedResult", "frm to")
 TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit")
 
 if __name__ == "__main__":
@@ -171,26 +150,12 @@ if __name__ == "__main__":
     account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
     env_funder = get_env_funder(env_connection)
-
-    config = LoadConfig(test_duration=env_int("TOTAL_TEST_DURATION_SEC"),
-                        account_count=env_int("TOTAL_TEST_ACCOUNTS"),
-                        tx_per_sec=env_int("TX_PER_SEC"),
-                        gas_tier=env("THRESHOLD"),
-                        funding_gas_tier=env("FUND_THRESHOLD"),
-                        funding_tx_per_sec=env_int("FUNDING_TX_PER_SEC"),
-                        funding_max_gas_price=env_int("FUNDING_MAX_GAS_PRICE"),
-                        prefund_multiplier=env_float("PREFUND_MULTIPLIER"),
-                        gas_update_interval=env_int("GAS_UPDATE_INTERVAL"),
-                        block_update_interval=env_int("BLOCK_UPDATE_INTERVAL"),
-                        initial_token_transfer_gas_limit=env_int("INITIAL_TOKEN_TRANSFER_GAS_LIMIT"),
-                        ether_transfer_gas_limit=env_int("ETHER_TRANSFER_GAS_LIMIT"),
-                        token_transfer_gas_limit=env_int("TOKEN_TRANSFER_GAS_LIMIT"))
-
+    env_config = get_env_config()
     log(f"load configuration is {config}")
 
     load_test(env_connection,
               env_funder,
-              config,
+              env_config,
               account_writer,
               tx_writer,
               tx_plan_writer,
