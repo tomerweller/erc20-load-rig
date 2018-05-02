@@ -14,9 +14,9 @@ LoadConfig = namedtuple("LoadConfig",
 
 
 def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
-    tx_count_per_acount = {account.private_key: 0 for account in accounts}
+    tx_count_per_acount = {account.address: 0 for account in accounts}
     for pre_tx in pre_txs:
-        tx_count_per_acount[pre_tx[0].private_key] += 1
+        tx_count_per_acount[pre_tx.frm] += 1
 
     load_gas_price = shard_gas_price.value
     ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
@@ -34,10 +34,10 @@ def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
         to_address = account.address
         total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
                       tx_count_per_acount[
-                          account.private_key]
+                          account.address]
         fund_ether_tx_hash = conn.send_ether(funder, to_address, total_ether, funding_gas_price,
                                              config.ether_transfer_gas_limit)
-        fund_tokens_tx_hash = conn.send_tokens(funder, to_address, tx_count_per_acount[account.private_key],
+        fund_tokens_tx_hash = conn.send_tokens(funder, to_address, tx_count_per_acount[account.address],
                                                funding_gas_price, config.initial_token_transfer_gas_limit)
         funding_txs.append(fund_ether_tx_hash)
         funding_txs.append(fund_tokens_tx_hash)
@@ -69,10 +69,11 @@ def monitor_gas_price(gas_tier, shared_gas_price, interval):
         time.sleep(interval)
 
 
-def do_load(conn, config, txs, shared_gas_price, shared_latest_block, tx_writer):
+def do_load(conn, config, accounts, txs, shared_gas_price, shared_latest_block, tx_writer):
     start_time = time.time()
     interval = 1 / config.tx_per_sec
     results = []
+    accounts_dict = {account.address: account for account in accounts}
     for i, tx in enumerate(txs):
         log(f"submitting tx {i}/{len(txs)}")
         time_to_execute = start_time + i * interval
@@ -80,7 +81,7 @@ def do_load(conn, config, txs, shared_gas_price, shared_latest_block, tx_writer)
             time.sleep(time_to_execute - time.time())
 
         tx_time = int(time.time())
-        frm, to = tx
+        frm, to = accounts_dict[tx.frm], accounts_dict[tx.to]
         gas_price = shared_gas_price.value
         tx_hash = conn.send_tokens(frm, to.address, 1, int(gas_price),
                                    config.token_transfer_gas_limit)
@@ -109,12 +110,13 @@ def prepare_txs(config, account_writer, tx_plan_writer):
     if config.account_count == config.tx_per_sec * config.test_duration:
         log(f"generating one tx per account ({total_tx})")
         frms = accounts[:]
-        planned_txs = [(frms.pop(), random.choice(accounts)) for _ in range(total_tx)]
+        planned_txs = [TxPlannedResult(frms.pop().address, random.choice(accounts).address) for _ in range(total_tx)]
     else:
         log(f"pre-computing {total_tx} transactions")
-        planned_txs = [(random.choice(accounts), random.choice(accounts)) for _ in range(total_tx)]
+        planned_txs = [TxPlannedResult(random.choice(accounts).address, random.choice(accounts).address) for _ in
+                       range(total_tx)]
 
-    tx_plan_writer.append_all(TxPlannedResult(tx[0].address, tx[1].address) for tx in planned_txs)
+    tx_plan_writer.append_all(planned_txs)
     return accounts, planned_txs
 
 
@@ -139,7 +141,7 @@ def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, b
     block_process.start()
 
     log("executing txs")
-    tx_results = do_load(conn, config, planned_txs, shared_gas_price, shared_latest_block, tx_writer)
+    tx_results = do_load(conn, config, accounts, planned_txs, shared_gas_price, shared_latest_block, tx_writer)
 
     log(f"killing gas monitor")
     gas_process.terminate()
