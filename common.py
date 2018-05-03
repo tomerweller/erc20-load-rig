@@ -3,6 +3,8 @@ import sys
 import os
 import math
 import time
+from multiprocessing import Process, Value
+
 import numpy as np
 
 from collections import namedtuple
@@ -318,6 +320,21 @@ def monitor_gas_price(gas_tier, shared_gas_price, interval):
         except ValueError as e:
             log(f"exception fetching gas price : {e}")
         time.sleep(interval)
+
+
+class GasMonitorProcess:
+    def __init__(self, gas_tier, interval):
+        self._shared_gas_price = Value('d', float(get_gas_price(gas_tier)))
+        self._process = Process(target=monitor_gas_price, args=(gas_tier, self._shared_gas_price, interval))
+
+    def start(self):
+        self._process.start()
+
+    def stop(self):
+        self._process.terminate()
+
+    def get_latest_gas_price(self):
+        return self._shared_gas_price.value
 
 
 def get_env_connection():

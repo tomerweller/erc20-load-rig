@@ -1,19 +1,18 @@
 import random
 import time
 from collections import namedtuple
-from multiprocessing import Process, Value
-from block_monitor import monitor_block_timestamps, BlockResult
+from block_monitor import BlockResult, BlockMonitorProcess
 
-from common import now_str, get_gas_price, log, CSVWriter, wei_to_ether, get_env_connection, get_env_funder, \
-    AccountCreator, AccountResult, monitor_gas_price, get_env_config, TxPlannedResult
+from common import now_str, log, CSVWriter, wei_to_ether, get_env_connection, get_env_funder, AccountCreator, \
+    AccountResult, get_env_config, TxPlannedResult, GasMonitorProcess
 
 
-def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
+def fund_accounts(conn, funder, config, accounts, gas_monitor, pre_txs):
     tx_count_per_acount = {account.address: 0 for account in accounts}
     for pre_tx in pre_txs:
         tx_count_per_acount[pre_tx.frm] += 1
 
-    load_gas_price = shard_gas_price.value
+    load_gas_price = gas_monitor.get_latest_gas_price()
     ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
     expected = (len(accounts) * config.funding_max_gas_price * config.ether_transfer_gas_limit) + \
                (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + \
@@ -25,7 +24,7 @@ def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
 
     funding_txs = []
     for i, account in enumerate(accounts):
-        funding_gas_price = min(shard_gas_price.value, config.funding_max_gas_price)
+        funding_gas_price = min(gas_monitor.get_latest_gas_price(), config.funding_max_gas_price)
         to_address = account.address
         total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
                       tx_count_per_acount[
@@ -49,7 +48,7 @@ def fund_accounts(conn, funder, config, accounts, shard_gas_price, pre_txs):
     log(f"delta from estimate (wei): {expected-(start_balance-final_balance)}")
 
 
-def do_load(conn, config, accounts, txs, shared_gas_price, shared_latest_block, tx_writer):
+def do_load(conn, config, accounts, txs, gas_monitor, block_monitor, tx_writer):
     start_time = time.time()
     interval = 1 / config.tx_per_sec
     results = []
@@ -62,11 +61,11 @@ def do_load(conn, config, accounts, txs, shared_gas_price, shared_latest_block, 
 
         tx_time = int(time.time())
         frm, to = accounts_dict[tx.frm], accounts_dict[tx.to]
-        gas_price = shared_gas_price.value
+        gas_price = gas_monitor.get_latest_gas_price()
         tx_hash = conn.send_tokens(frm, to.address, 1, int(gas_price),
                                    config.token_transfer_gas_limit)
         tx_result = TxResult(frm=frm.address, to=to.address, tx_hash=tx_hash, timestamp=str(tx_time),
-                             gas_price=str(gas_price), block_at_submit=shared_latest_block.value)
+                             gas_price=str(gas_price), block_at_submit=block_monitor.get_latest_block_number())
         log(tx_result)
         results.append(tx_result)
         tx_writer.append(tx_result)
@@ -106,25 +105,23 @@ def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, b
     # start monitoring gas
     log("starting gas monitoring")
 
-    shared_gas_price = Value('d', float(get_gas_price(config.gas_tier)))
-    gas_process = Process(target=monitor_gas_price,
-                          args=(config.gas_tier, shared_gas_price, config.gas_update_interval))
-    gas_process.start()
+    gas_monitor = GasMonitorProcess(config.gas_tier, config.gas_update_interval)
+    gas_monitor.start()
 
     # funding
-    fund_accounts(conn, funder, config, accounts, shared_gas_price, planned_txs)
+    fund_accounts(conn, funder, config, accounts, gas_monitor, planned_txs)
 
-    shared_latest_block = Value('d', float(conn.get_latest_block().number))
-    log("starting block monitoring")
-    block_process = Process(target=monitor_block_timestamps,
-                            args=(block_writer, config.block_update_interval, shared_latest_block))
-    block_process.start()
+    # start block monitor
+    block_monitor = BlockMonitorProcess(block_writer, config.block_update_interval, conn.get_latest_block().number)
+    block_monitor.start()
 
+    # start load
     log("executing txs")
-    tx_results = do_load(conn, config, accounts, planned_txs, shared_gas_price, shared_latest_block, tx_writer)
+    tx_results = do_load(conn, config, accounts, planned_txs, gas_monitor, block_monitor, tx_writer)
 
+    # stop gas monitoring
     log(f"killing gas monitor")
-    gas_process.terminate()
+    gas_monitor.stop()
 
     for i, tx_result in enumerate(tx_results):
         tx_hash = tx_result.tx_hash
@@ -137,7 +134,7 @@ def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, b
         time.sleep(config.block_update_interval)
 
     log(f"killing block monitor")
-    block_process.terminate()
+    block_monitor.stop()
 
 
 TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_submit")

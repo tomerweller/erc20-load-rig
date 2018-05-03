@@ -1,6 +1,6 @@
 import time
 from collections import namedtuple
-from multiprocessing import Value
+from multiprocessing import Value, Process
 
 from common import CSVWriter, log, now_str, get_env_connection
 
@@ -37,6 +37,23 @@ def monitor_block_timestamps(csv_out, interval, shared_latest_block):
         csv_out.append(row)
         log(row)
         latest_block = conn.get_block_wait(latest_block.number + 1, interval)
+
+
+class BlockMonitorProcess:
+    def __init__(self, csv_writer, interval, initial_block_number):
+        self._shared_block_number = Value('d', float(initial_block_number))
+        self._process = Process(target=monitor_block_timestamps, args=(csv_writer, interval,
+                                                                       self._shared_block_number))
+
+    def start(self):
+        log("starting block monitoring")
+        self._process.start()
+
+    def stop(self):
+        self._process.terminate()
+
+    def get_latest_block_number(self):
+        return self._shared_block_number.value
 
 
 if __name__ == "__main__":
