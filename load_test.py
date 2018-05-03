@@ -1,51 +1,10 @@
-import random
 import time
 from collections import namedtuple
 from block_monitor import BlockResult, BlockMonitorProcess
 
-from common import now_str, log, CSVWriter, wei_to_ether, get_env_connection, get_env_funder, AccountCreator, \
-    AccountResult, get_env_config, TxPlannedResult, GasMonitorProcess
-
-
-def fund_accounts(conn, funder, config, accounts, gas_monitor, pre_txs):
-    tx_count_per_acount = {account.address: 0 for account in accounts}
-    for pre_tx in pre_txs:
-        tx_count_per_acount[pre_tx.frm] += 1
-
-    load_gas_price = gas_monitor.get_latest_gas_price()
-    ether_per_tx = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier
-    expected = (len(accounts) * config.funding_max_gas_price * config.ether_transfer_gas_limit) + \
-               (len(accounts) * config.funding_max_gas_price * config.initial_token_transfer_gas_limit) + \
-               ether_per_tx * len(pre_txs)
-    log(f"funding {len(accounts)} accounts with a total of ~{wei_to_ether(expected)} ether")
-    input("press enter to continue...")
-    start_balance = conn.get_balance(funder.address)
-    log(f"current funder balance is {wei_to_ether(start_balance)}")
-
-    funding_txs = []
-    for i, account in enumerate(accounts):
-        funding_gas_price = min(gas_monitor.get_latest_gas_price(), config.funding_max_gas_price)
-        to_address = account.address
-        total_ether = config.token_transfer_gas_limit * load_gas_price * config.prefund_multiplier * \
-                      tx_count_per_acount[
-                          account.address]
-        fund_ether_tx_hash = conn.send_ether(funder, to_address, total_ether, funding_gas_price,
-                                             config.ether_transfer_gas_limit)
-        fund_tokens_tx_hash = conn.send_tokens(funder, to_address, tx_count_per_acount[account.address],
-                                               funding_gas_price, config.initial_token_transfer_gas_limit)
-        funding_txs.append(fund_ether_tx_hash)
-        funding_txs.append(fund_tokens_tx_hash)
-        log(f"funding {to_address}, {fund_ether_tx_hash}, {fund_tokens_tx_hash} ({i}/{len(accounts)})")
-        time.sleep(1 / config.funding_tx_per_sec)  # for sanity
-
-    for i, tx_hash in enumerate(funding_txs):
-        log(f"waiting for tx {tx_hash} to complete. ({i}/{len(funding_txs)})")
-        conn.wait_for_tx(tx_hash)
-
-    final_balance = conn.get_balance(funder.address)
-    log(f"new funder balance : {wei_to_ether(final_balance)}")
-    log(f"total spent: {wei_to_ether(start_balance-final_balance)}")
-    log(f"delta from estimate (wei): {expected-(start_balance-final_balance)}")
+from common import now_str, log, CSVWriter, get_env_connection, get_env_funder, AccountResult, get_env_config, \
+    TxPlannedResult, GasMonitorProcess, get_arg, csv_reader, has_args, AccountWrapper
+from load_prepare import prepare
 
 
 def do_load(conn, config, accounts, txs, gas_monitor, block_monitor, tx_writer):
@@ -74,42 +33,10 @@ def do_load(conn, config, accounts, txs, gas_monitor, block_monitor, tx_writer):
     return results
 
 
-def prepare_txs(config, account_writer, tx_plan_writer):
-    # generate random accounts
-    log("generating accounts")
-    account_creator = AccountCreator()
-    accounts = [account_creator.next() for _ in range(config.account_count)]
-
-    # dump accounts
-    log("dumping accounts to csv")
-    account_writer.append_all(account.to_account_result() for account in accounts)
-
-    # pre-compute (from,to) tx pairs
-    total_tx = config.test_duration * config.tx_per_sec
-    if config.account_count == config.tx_per_sec * config.test_duration:
-        log(f"generating one tx per account ({total_tx})")
-        frms = accounts[:]
-        planned_txs = [TxPlannedResult(frms.pop().address, random.choice(accounts).address) for _ in range(total_tx)]
-    else:
-        log(f"pre-computing {total_tx} transactions")
-        planned_txs = [TxPlannedResult(random.choice(accounts).address, random.choice(accounts).address) for _ in
-                       range(total_tx)]
-
-    tx_plan_writer.append_all(planned_txs)
-    return accounts, planned_txs
-
-
-def load_test(conn, funder, config, account_writer, tx_writer, tx_plan_writer, block_writer):
-    accounts, planned_txs = prepare_txs(config, account_writer, tx_plan_writer)
-
+def load_test(conn, config, accounts, planned_txs, tx_writer, block_writer):
     # start monitoring gas
-    log("starting gas monitoring")
-
     gas_monitor = GasMonitorProcess(config.gas_tier, config.gas_update_interval)
     gas_monitor.start()
-
-    # funding
-    fund_accounts(conn, funder, config, accounts, gas_monitor, planned_txs)
 
     # start block monitor
     block_monitor = BlockMonitorProcess(block_writer, config.block_update_interval, conn.get_latest_block().number)
@@ -142,18 +69,20 @@ TxResult = namedtuple("TxResult", "frm to tx_hash timestamp gas_price block_at_s
 if __name__ == "__main__":
     now = now_str()
     tx_writer = CSVWriter(f"results/txs.{now}.csv", TxResult._fields)
-    tx_plan_writer = CSVWriter(f"results/txs.planned.{now}.csv", TxPlannedResult._fields)
     block_writer = CSVWriter(f"results/blocks.{now_str()}.csv", BlockResult._fields)
-    account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
     env_connection = get_env_connection()
-    env_funder = get_env_funder(env_connection)
     env_config = get_env_config()
     log(f"load configuration is {env_config}")
+    if has_args():
+        log("skipping preparations")
+        accounts = [AccountWrapper(account_result.private_key, 0)
+                    for account_result in csv_reader(get_arg(0), AccountResult)]
+        planned_tx = csv_reader(get_arg(1), TxPlannedResult)
+    else:
+        log("initiating preparations")
+        env_funder = get_env_funder(env_connection)
+        tx_plan_writer = CSVWriter(f"results/txs.planned.{now}.csv", TxPlannedResult._fields)
+        account_writer = CSVWriter(f"results/accounts.{now}.csv", AccountResult._fields)
+        accounts, planned_tx = prepare(env_connection, env_funder, env_config, account_writer, tx_plan_writer)
 
-    load_test(env_connection,
-              env_funder,
-              env_config,
-              account_writer,
-              tx_writer,
-              tx_plan_writer,
-              block_writer)
+    load_test(env_connection, env_config, accounts, planned_tx, tx_writer, block_writer)

@@ -41,6 +41,10 @@ def now_str():
     return datetime.now().strftime("%Y-%m-%d.%H:%M:%S")
 
 
+def has_args():
+    return len(sys.argv) > 1
+
+
 def get_arg(i=0):
     if len(sys.argv) < (2 + i):
         raise Exception(f"expected at least {i+1} command line argument/s")
