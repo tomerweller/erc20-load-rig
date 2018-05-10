@@ -15,11 +15,11 @@ def cleanup(csv_in):
     gas_limit = 21000
 
     log(f"using gas price: {gas_price}, gas limit: {gas_limit}")
-    account_results = csv_reader(csv_in, AccountResult._fields)
+    account_results = csv_reader(csv_in, AccountResult)
 
     for i, account_result in enumerate(account_results):
         account = conn.get_account(account_result.private_key)
-        log(f"cleaning up {account.address} ({i}/{len(accounts)})")
+        log(f"cleaning up {account.address} ({i}/{len(account_results)})")
         balance = conn.get_balance(account.address)
         if balance >= gas_limit * gas_price:
             tx_hash = conn.send_ether(account, account.get_use_nonce(), funder.address,
