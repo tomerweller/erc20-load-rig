@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 from collections import namedtuple
 
 from block_monitor import BlockResult

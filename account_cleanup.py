@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 import time
 
 from common import get_gas_price_low, get_arg, log, get_env_connection, get_env_funder, AccountResult, csv_reader

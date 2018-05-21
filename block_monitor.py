@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 import time
 from collections import namedtuple
 from multiprocessing import Value, Process
