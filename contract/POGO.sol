@@ -1,4 +1,5 @@
 /*
+Ripped off from: https://github.com/ConsenSys/Tokens/blob/master/contracts/eip20/EIP20.sol
 Implements EIP20 token standard: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md
 .*/
 
