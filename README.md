@@ -1,4 +1,4 @@
-# ERC20-LOAD-SANDBOX
+# ERC20 Load Rig
 
 A set of utilities to facilitate load testing of ERC20 token transfers. 
 
