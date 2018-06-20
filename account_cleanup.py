@@ -23,8 +23,7 @@ def cleanup(csv_in):
         log(f"cleaning up {account.address} ({i}/{len(account_results)})")
         balance = conn.get_balance(account.address)
         if balance >= gas_limit * gas_price:
-            tx_hash = conn.send_ether(account, account.get_use_nonce(), funder.address,
-                                      balance - gas_limit * gas_price, gas_price, gas_limit)
+            tx_hash = conn.send_ether(account, funder.address, balance - gas_limit * gas_price, gas_price, gas_limit)
             log(f"{account.address}, {balance}, {tx_hash}")
         else:
             log(f"balance too low: {balance}")
