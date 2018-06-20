@@ -1,7 +1,6 @@
 env.sh
 .env
-*.csv
 .idea/
 venv/
 __pycache__/
-results/
+.directory
