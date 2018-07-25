@@ -1,6 +1,6 @@
 # ERC20 Load Rig
 
-A set of utilities to facilitate load testing of ERC20 token transfers. 
+A set of utilities to facilitate load testing of ERC20 token transfers. Read about the results [here]().
 
 ## Notes
 
@@ -13,9 +13,27 @@ much as possible.
 - Block timestamps are unreliable and shouldn't be used for response time measurements. Instead, the testing rig includes
 a block monitor that takes note of observed block timestamps using the attached ethereum node.  
  
-## Test Environment
-The environment used to generate the attached results: 
+## Results
 
+The [results](results) folder contains the output from 4 load tests performed during April and May of 2018. These results
+are analyzed and discussed in an accompanying [Medium post](). 
+
+###Test Dates and Total Costs
+test|Date|Eth Spent|USD/Eth|notional USD value
+---|---|---|---|---
+test 1|17-Apr|1.41150969|511.15|721
+test 2|19-Apr|6.92814991|524.04|3,631
+test 3|20-Apr|11.86570882|567.99|6,740
+test 4|7-May|3.13062921|793.34|2,484
+total| |23.33599764| |13,575
+
+### Transaction Confirmation Heuristic
+Due to the nature of proof-of-work, short-lived forks happen in Ethereum. This means that even if a transaction 
+appears in a block, it’s possible that block is part of a temporary fork and will eventually be discarded. Ethereum 
+apps therefore usually wait until the transaction is 4-12 blocks in the past before treating it as final. For analysis, 
+the lower number was used: a transaction was considered confirmed after 4 blocks.
+
+### Test Environment
 - AWS `t4.xlarge` instance with attached EBS storage.
 - Parity 1.10 
 - Tests performed on the same machine using the IPC interface. 
