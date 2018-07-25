@@ -18,7 +18,7 @@ a block monitor that takes note of observed block timestamps using the attached 
 The [results](results) folder contains the output from 4 load tests performed during April and May of 2018. These results
 are analyzed and discussed in an accompanying [Medium post](). 
 
-###Test Dates and Total Costs
+### Test Dates and Total Costs
 test|Date|Eth Spent|USD/Eth|notional USD value
 ---|---|---|---|---
 test 1|17-Apr|1.41150969|511.15|721
