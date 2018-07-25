@@ -16,7 +16,7 @@ a block monitor that takes note of observed block timestamps using the attached 
 ## Results
 
 The [results](results) folder contains the output from 4 load tests performed during April and May of 2018. These results
-are analyzed and discussed in an accompanying [Medium post](). 
+are described and analyzed in an accompanying [Medium post](). 
 
 ### Test Dates and Total Costs
 test|Date|Eth Spent|USD/Eth|notional USD value
@@ -26,6 +26,8 @@ test 2|19-Apr|6.92814991|524.04|3,631
 test 3|20-Apr|11.86570882|567.99|6,740
 test 4|7-May|3.13062921|793.34|2,484
 total| |23.33599764| |13,575
+
+
 
 ### Transaction Confirmation Heuristic
 Due to the nature of proof-of-work, short-lived forks happen in Ethereum. This means that even if a transaction 
