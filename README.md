@@ -77,23 +77,20 @@ FUNDING_MAX_GAS_PRICE| for sanity, in case gas prices climb. (wei)
 ```bash
 ./load_prepare.py
 ```
-- prepare a set of random transactions according to configuration
-- create accounts and fund them using the funder account, according to configuration
+Prepares a set of random transactions, creates accounts and funds them using the funder account, according to configuration.
 
-output: 
-- results/txs.planned.{timestamp}.csv| planned txs (from, to)
-- results/accounts.{timestamp}.csv| funded accounts (private_key, address)
+Output files (csv): 
+- Planned txs (from, to): **results/txs.planned.{timestamp}.csv** : 
+- Funded Accounts: (private_key, address): **results/accounts.{timestamp}.csv** 
 
 ### Execute test
-
 ```bash
 ./load_test.py <accounts_csv> <planned_txs_csv>
 ```
-- monitor gas and blocks
-- execute transactions according to load configuration
+Start gas and block monitors and then executes all the supplied transactions.
 
-output: 
-- results/blocks.{timestamp}.csv: observed blocks, including statistics
+Output files (csv): 
+- Observed blocks, including statistics: **results/blocks.{timestamp}.csv**: 
 - results/txs.{timestamp}.csv
 
 ### Process results
@@ -101,14 +98,16 @@ output:
 ```bash
 ./collect_results.py <txs_csv> <blocks_csv>
 ```
-- join transaction and block data to a single dataset
+Joins transaction and block data to a single dataset.
 
-output: 
-- results/txs.plus.{timestamp}.csv
+Output files (csv): 
+- Joined transactions data: **results/txs.plus.{timestamp}.csv**
+
+*Note: joined tx data contains confirmation times for 12 blocks after transaction was mined. Each block has two timestamps: the one reported by the miner, and the one observed by the local node.* 
 
 ### Cleanup
 
 ```bash
 ./account_cleanup.py <accounts_csv>
 ```
-- move all test account funds back to funder account
+Moves all test account funds back to funder account.
