@@ -79,7 +79,7 @@ FUNDING_MAX_GAS_PRICE| for sanity, in case gas prices climb. (wei)
 ```
 Prepares a set of random transactions, creates accounts and funds them using the funder account, according to configuration.
 
-Output files (csv): 
+#### Output files (csv): 
 - Planned txs (from, to): **results/txs.planned.{timestamp}.csv** : 
 - Funded Accounts: (private_key, address): **results/accounts.{timestamp}.csv** 
 
@@ -89,7 +89,7 @@ Output files (csv):
 ```
 Start gas and block monitors and then executes all the supplied transactions.
 
-Output files (csv): 
+#### Output files (csv): 
 - Observed blocks, including statistics: **results/blocks.{timestamp}.csv**: 
 - results/txs.{timestamp}.csv
 
@@ -100,7 +100,7 @@ Output files (csv):
 ```
 Joins transaction and block data to a single dataset.
 
-Output files (csv): 
+#### Output files (csv): 
 - Joined transactions data: **results/txs.plus.{timestamp}.csv**
 
 *Note: joined tx data contains confirmation times for 12 blocks after transaction was mined. Each block has two timestamps: the one reported by the miner, and the one observed by the local node.* 
