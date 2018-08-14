@@ -1,6 +1,6 @@
 # ERC20 Load Rig
 
-A set of utilities to facilitate load testing of ERC20 token transfers. Read about the results [here]().
+A set of utilities to facilitate load testing of ERC20 token transfers. Read about the results [here](https://blog.stellarx.com/the-great-filter-why-you-shouldnt-ico-on-ethereum/).
 
 ## Notes
 
@@ -16,7 +16,7 @@ a block monitor that takes note of observed block timestamps using the attached 
 ## Results
 
 The [results](results) folder contains the output from 4 load tests performed during April and May of 2018. These results
-are described and analyzed in an accompanying [Medium post](). 
+are described and analyzed in an accompanying [StellarX blog post](https://blog.stellarx.com/the-great-filter-why-you-shouldnt-ico-on-ethereum/). 
 
 In our analysis, a transaction was considered "confirmed" after 4 blocks. Due to the nature of proof-of-work, short-lived forks happen in Ethereum. This means that even if a transaction appears in a block, it’s possible that block is part of a temporary fork and will eventually be discarded. Ethereum apps therefore usually wait until the transaction is 4-12 blocks in the past before treating it as final. Our guiding value in this test was to bias in favor of Ethereum wherever possible, and so we used the lower number.
 
